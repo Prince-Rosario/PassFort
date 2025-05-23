@@ -2,112 +2,227 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
-using PassFort.Api.Models.Authentication;
-using PassFort.Api.Services;
+using PassFort.BLL.Services.Interfaces;
+using PassFort.DTO.DTOs;
 
-namespace PassFort.Api.Controllers
+namespace PassFort.API.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
     [EnableCors("AllowSpecificOrigins")]
     public class AuthController : ControllerBase
     {
-        private readonly AuthService _authService;
-        private readonly TokenService _tokenService;
+        private readonly IAuthService _authService;
 
-        public AuthController(AuthService authService, TokenService tokenService)
+        public AuthController(IAuthService authService)
         {
             _authService = authService;
-            _tokenService = tokenService;
         }
 
         [HttpPost("register")]
-        public async Task<IActionResult> Register([FromBody] RegisterRequestModel model)
+        public async Task<IActionResult> Register([FromBody] RegisterRequestDto request)
         {
-            if (!ModelState.IsValid)
+            try
             {
-                return BadRequest(ModelState);
-            }
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(ModelState);
+                }
 
-            var result = await _authService.Register(model);
-            if (!result.Success)
+                var result = await _authService.RegisterAsync(request);
+                return Ok(result);
+            }
+            catch (InvalidOperationException ex)
             {
-                return BadRequest(result);
+                return BadRequest(new { message = ex.Message });
             }
-
-            return Ok(result);
+            catch (Exception ex)
+            {
+                return StatusCode(
+                    500,
+                    new { message = "An error occurred during registration", details = ex.Message }
+                );
+            }
         }
 
         [HttpPost("login")]
-        public async Task<IActionResult> Login([FromBody] LoginRequestModel model)
+        public async Task<IActionResult> Login([FromBody] LoginRequestDto request)
         {
-            if (!ModelState.IsValid)
+            try
             {
-                return BadRequest(ModelState);
-            }
-
-            var result = await _authService.Login(model);
-            if (!result.Success)
-            {
-                // If 2FA is required, return 200 OK with the 2FA required flag
-                if (result.RequiresTwoFactor)
+                if (!ModelState.IsValid)
                 {
-                    return Ok(result);
+                    return BadRequest(ModelState);
                 }
-                return BadRequest(result);
-            }
 
-            return Ok(result);
+                var result = await _authService.LoginAsync(request);
+                return Ok(result);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(
+                    500,
+                    new { message = "An error occurred during login", details = ex.Message }
+                );
+            }
         }
 
         [HttpPost("refresh-token")]
-        public async Task<IActionResult> RefreshToken([FromBody] TokenRefreshRequestModel model)
+        public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenRequestDto request)
         {
-            if (!ModelState.IsValid)
+            try
             {
-                return BadRequest(ModelState);
-            }
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(ModelState);
+                }
 
-            var result = await _tokenService.RefreshToken(model.RefreshToken);
-            if (!result.Success)
+                var result = await _authService.RefreshTokenAsync(request);
+                return Ok(result);
+            }
+            catch (Exception ex)
             {
-                return BadRequest(result);
+                return BadRequest(new { message = "Invalid refresh token", details = ex.Message });
             }
-
-            return Ok(result);
         }
 
         [HttpPost("logout")]
         [Authorize]
-        public async Task<IActionResult> Logout([FromBody] LogoutRequestModel model)
+        public async Task<IActionResult> Logout([FromBody] RefreshTokenRequestDto request)
         {
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (string.IsNullOrEmpty(userId))
+            try
             {
-                return Unauthorized(new { success = false, message = "User not authenticated" });
-            }
-
-            // Extract the JWT token from the Authorization header
-            string jwtToken = string.Empty;
-            if (Request.Headers.TryGetValue("Authorization", out var authHeader))
-            {
-                var authHeaderValue = authHeader.FirstOrDefault();
-                if (
-                    !string.IsNullOrEmpty(authHeaderValue)
-                    && authHeaderValue.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
-                )
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (string.IsNullOrEmpty(userId))
                 {
-                    jwtToken = authHeaderValue.Substring("Bearer ".Length).Trim();
+                    return Unauthorized(new { message = "User not authenticated" });
                 }
-            }
 
-            var result = await _authService.Logout(userId, model.RefreshToken, jwtToken);
-            if (!result.Success)
+                // Extract the JWT token from the Authorization header
+                string jwtToken = string.Empty;
+                if (Request.Headers.TryGetValue("Authorization", out var authHeader))
+                {
+                    var authHeaderValue = authHeader.FirstOrDefault();
+                    if (
+                        !string.IsNullOrEmpty(authHeaderValue)
+                        && authHeaderValue.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
+                    )
+                    {
+                        jwtToken = authHeaderValue.Substring("Bearer ".Length).Trim();
+                    }
+                }
+
+                var result = await _authService.LogoutAsync(userId, request.RefreshToken, jwtToken);
+                return Ok(new { success = result, message = "Logged out successfully" });
+            }
+            catch (Exception ex)
             {
-                return BadRequest(result);
+                return StatusCode(
+                    500,
+                    new { message = "An error occurred during logout", details = ex.Message }
+                );
             }
+        }
 
-            return Ok(result);
+        [HttpPost("change-password")]
+        [Authorize]
+        public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequestDto request)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(ModelState);
+                }
+
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (string.IsNullOrEmpty(userId))
+                {
+                    return Unauthorized(new { message = "User not authenticated" });
+                }
+
+                var result = await _authService.ChangePasswordAsync(userId, request);
+                return Ok(new { success = result, message = "Password changed successfully" });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(
+                    500,
+                    new
+                    {
+                        message = "An error occurred while changing password",
+                        details = ex.Message,
+                    }
+                );
+            }
+        }
+
+        [HttpGet("user")]
+        [Authorize]
+        public async Task<IActionResult> GetUser()
+        {
+            try
+            {
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (string.IsNullOrEmpty(userId))
+                {
+                    return Unauthorized(new { message = "User not authenticated" });
+                }
+
+                var user = await _authService.GetUserAsync(userId);
+                return Ok(user);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(
+                    500,
+                    new
+                    {
+                        message = "An error occurred while retrieving user",
+                        details = ex.Message,
+                    }
+                );
+            }
+        }
+
+        [HttpPost("revoke-all-tokens")]
+        [Authorize]
+        public async Task<IActionResult> RevokeAllTokens()
+        {
+            try
+            {
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (string.IsNullOrEmpty(userId))
+                {
+                    return Unauthorized(new { message = "User not authenticated" });
+                }
+
+                var result = await _authService.RevokeAllTokensAsync(userId);
+                return Ok(new { success = result, message = "All tokens revoked successfully" });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(
+                    500,
+                    new
+                    {
+                        message = "An error occurred while revoking tokens",
+                        details = ex.Message,
+                    }
+                );
+            }
         }
     }
 }

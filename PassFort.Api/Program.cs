@@ -3,10 +3,14 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using PassFort.Api.Data;
-using PassFort.Api.Middleware;
-using PassFort.Api.Models;
-using PassFort.Api.Services;
+using PassFort.API.Middleware;
+using PassFort.BLL.Services;
+using PassFort.BLL.Services.Interfaces;
+using PassFort.DAL.Data;
+using PassFort.DAL.Entities;
+using PassFort.DAL.Repositories;
+using PassFort.DAL.Repositories.Interfaces;
+using PassFort.DTO.Configuration;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -81,16 +85,17 @@ else
     throw new InvalidOperationException("JwtSettings configuration is missing or invalid.");
 }
 
-// Register Services
-builder.Services.AddScoped<TokenService>();
-builder.Services.AddScoped<AuthService>();
-builder.Services.AddScoped<MfaService>();
+// Register Repository Layer (DAL)
+builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+builder.Services.AddScoped<IBlacklistedTokenRepository, BlacklistedTokenRepository>();
 
-// Register the token blacklist service as a singleton because it runs as a background service
-builder.Services.AddSingleton<TokenBlacklistService>();
-builder.Services.AddHostedService(provider => provider.GetRequiredService<TokenBlacklistService>());
+// Register Business Logic Layer (BLL)
+builder.Services.AddScoped<ITokenService, TokenService>();
+builder.Services.AddScoped<IAuthService, AuthService>();
 
-// CORS Configuration - Updated to specifically allow our test client
+// builder.Services.AddScoped<IMfaService, MfaService>(); // TODO: Implement MfaService
+
+// CORS Configuration
 builder.Services.AddCors(options =>
 {
     options.AddPolicy(
@@ -98,10 +103,7 @@ builder.Services.AddCors(options =>
         builder =>
         {
             builder
-                .WithOrigins(
-                    "http://localhost:8080", // Test client origin
-                    "http://127.0.0.1:8080" // Alternative test client origin
-                )
+                .WithOrigins("http://localhost:8080", "http://127.0.0.1:8080")
                 .AllowAnyMethod()
                 .AllowAnyHeader()
                 .AllowCredentials();
@@ -120,7 +122,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-// Global CORS policy - updated
+// Global CORS policy
 app.UseCors("AllowSpecificOrigins");
 
 // Add token blacklist middleware - must be before Authentication

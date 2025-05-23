@@ -1,7 +1,7 @@
 using System;
 using Microsoft.AspNetCore.Identity;
 
-namespace PassFort.Api.Models
+namespace PassFort.DAL.Entities
 {
     public class ApplicationUser : IdentityUser
     {
@@ -14,5 +14,12 @@ namespace PassFort.Api.Models
         public string? RecoveryKey { get; set; }
         public bool IsLocked { get; set; } = false;
         public int FailedLoginAttempts { get; set; } = 0;
+
+        // Navigation properties
+        public ICollection<RefreshToken> RefreshTokens { get; set; } =
+            new List<RefreshToken>();
+
+        public ICollection<BlacklistedToken> BlacklistedTokens { get; set; } =
+            new List<BlacklistedToken>();
     }
 }
