@@ -15,11 +15,17 @@ namespace PassFort.DAL.Entities
         public bool IsLocked { get; set; } = false;
         public int FailedLoginAttempts { get; set; } = 0;
 
-        // Navigation properties
-        public ICollection<RefreshToken> RefreshTokens { get; set; } =
-            new List<RefreshToken>();
+        // MFA-related properties
+        public string? TwoFactorSecretKey { get; set; }
+        public DateTime? TwoFactorEnabledAt { get; set; }
+        public int RecoveryCodesRemaining { get; set; } = 0;
 
-        public ICollection<BlacklistedToken> BlacklistedTokens { get; set; } =
+        // Navigation properties
+        public virtual ICollection<RefreshToken> RefreshTokens { get; set; } =
+            new List<RefreshToken>();
+        public virtual ICollection<BlacklistedToken> BlacklistedTokens { get; set; } =
             new List<BlacklistedToken>();
+        public virtual ICollection<UserRecoveryCode> RecoveryCodes { get; set; } =
+            new List<UserRecoveryCode>();
     }
 }

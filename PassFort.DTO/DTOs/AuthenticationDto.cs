@@ -12,6 +12,9 @@ namespace PassFort.DTO.DTOs
         public string Password { get; set; } = string.Empty;
 
         public bool RememberMe { get; set; } = false;
+
+        // Optional 2FA code
+        public string? TwoFactorCode { get; set; }
     }
 
     public class RegisterRequestDto

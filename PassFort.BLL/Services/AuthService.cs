@@ -1,5 +1,6 @@
 using BCrypt.Net;
 using Microsoft.AspNetCore.Identity;
+using OtpNet;
 using PassFort.BLL.Mappers;
 using PassFort.BLL.Services.Interfaces;
 using PassFort.DAL.Entities;
@@ -14,18 +15,21 @@ namespace PassFort.BLL.Services
         private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly ITokenService _tokenService;
         private readonly IBlacklistedTokenRepository _blacklistedTokenRepository;
+        private readonly IUserRecoveryCodeRepository _recoveryCodeRepository;
 
         public AuthService(
             UserManager<ApplicationUser> userManager,
             SignInManager<ApplicationUser> signInManager,
             ITokenService tokenService,
-            IBlacklistedTokenRepository blacklistedTokenRepository
+            IBlacklistedTokenRepository blacklistedTokenRepository,
+            IUserRecoveryCodeRepository recoveryCodeRepository
         )
         {
             _userManager = userManager;
             _signInManager = signInManager;
             _tokenService = tokenService;
             _blacklistedTokenRepository = blacklistedTokenRepository;
+            _recoveryCodeRepository = recoveryCodeRepository;
         }
 
         public async Task<TokenResponseDto> RegisterAsync(RegisterRequestDto request)
@@ -89,6 +93,27 @@ namespace PassFort.BLL.Services
                 throw new UnauthorizedAccessException("Invalid email or password");
             }
 
+            // Check if 2FA is enabled and code is required
+            if (user.TwoFactorEnabled)
+            {
+                // If no 2FA code provided, throw exception indicating 2FA is required
+                if (string.IsNullOrEmpty(request.TwoFactorCode))
+                {
+                    throw new UnauthorizedAccessException(
+                        "Two-factor authentication code is required"
+                    );
+                }
+
+                // Verify the 2FA code
+                var is2FaValid = await VerifyTwoFactorCodeAsync(user, request.TwoFactorCode);
+
+                if (!is2FaValid)
+                {
+                    throw new UnauthorizedAccessException("Invalid two-factor authentication code");
+                }
+            }
+
+            // Reset failed login attempts on successful login
             user.FailedLoginAttempts = 0;
             user.LastLoginAt = DateTime.UtcNow;
             await _userManager.UpdateAsync(user);
@@ -168,5 +193,65 @@ namespace PassFort.BLL.Services
         {
             return await _tokenService.RevokeAllUserTokensAsync(userId);
         }
+
+        #region Private 2FA Helper Methods
+
+        private async Task<bool> VerifyTwoFactorCodeAsync(ApplicationUser user, string code)
+        {
+            // Try to verify as TOTP code first
+            if (
+                !string.IsNullOrEmpty(user.TwoFactorSecretKey)
+                && VerifyTotpCode(user.TwoFactorSecretKey, code)
+            )
+            {
+                return true;
+            }
+
+            // If TOTP fails, try recovery code
+            return await VerifyRecoveryCodeAsync(user.Id, code);
+        }
+
+        private static bool VerifyTotpCode(string secretKey, string code)
+        {
+            try
+            {
+                var keyBytes = Base32Encoding.ToBytes(secretKey);
+                var totp = new Totp(keyBytes);
+                return totp.VerifyTotp(code, out _, VerificationWindow.RfcSpecifiedNetworkDelay);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private async Task<bool> VerifyRecoveryCodeAsync(string userId, string recoveryCode)
+        {
+            var recoveryCodeEntity = await _recoveryCodeRepository.GetByUserIdAndCodeAsync(
+                userId,
+                recoveryCode
+            );
+            if (recoveryCodeEntity == null)
+            {
+                return false;
+            }
+
+            // Mark the recovery code as used
+            recoveryCodeEntity.IsUsed = true;
+            recoveryCodeEntity.UsedAt = DateTime.UtcNow;
+            await _recoveryCodeRepository.UpdateAsync(recoveryCodeEntity);
+
+            // Update the remaining count
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user != null)
+            {
+                user.RecoveryCodesRemaining = Math.Max(0, user.RecoveryCodesRemaining - 1);
+                await _userManager.UpdateAsync(user);
+            }
+
+            return true;
+        }
+
+        #endregion
     }
 }

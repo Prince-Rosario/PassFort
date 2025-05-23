@@ -88,12 +88,12 @@ else
 // Register Repository Layer (DAL)
 builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 builder.Services.AddScoped<IBlacklistedTokenRepository, BlacklistedTokenRepository>();
+builder.Services.AddScoped<IUserRecoveryCodeRepository, UserRecoveryCodeRepository>();
 
 // Register Business Logic Layer (BLL)
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
-
-// builder.Services.AddScoped<IMfaService, MfaService>(); // TODO: Implement MfaService
+builder.Services.AddScoped<IMfaService, MfaService>();
 
 // CORS Configuration
 builder.Services.AddCors(options =>

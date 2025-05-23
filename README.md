@@ -1,6 +1,6 @@
 # PassFort - Password Manager
 
-A secure password manager built with .NET 9 using **Layered Architecture** (N-tier Architecture) pattern.
+A secure password manager built with .NET 9 using **Layered Architecture** (N-tier Architecture) pattern with **Multi-Factor Authentication (MFA)** support.
 
 ## Architecture Pattern
 
@@ -33,6 +33,68 @@ This application follows the **Layered Architecture** pattern, which separates c
 │         DTOs, Configuration         │
 └─────────────────────────────────────┘
 ```
+
+## 🔐 Multi-Factor Authentication (MFA)
+
+PassFort includes comprehensive 2FA support with the following features:
+
+### ✅ MFA Features
+
+- **TOTP (Time-based One-Time Password)** support
+- **QR Code generation** for easy authenticator app setup
+- **Recovery codes** for account recovery
+- **Seamless login integration** with 2FA verification
+- **Secure secret key management**
+
+### 🔧 MFA Implementation
+
+#### **Supported Authenticator Apps**
+
+- Google Authenticator
+- Microsoft Authenticator
+- Authy
+- Any TOTP-compatible app
+
+#### **API Endpoints**
+
+| Endpoint                           | Method | Description                  |
+| ---------------------------------- | ------ | ---------------------------- |
+| `/api/mfa/enable`                  | POST   | Enable 2FA for user account  |
+| `/api/mfa/verify`                  | POST   | Verify TOTP code             |
+| `/api/mfa/disable`                 | POST   | Disable 2FA for user account |
+| `/api/mfa/status`                  | GET    | Get current 2FA status       |
+| `/api/mfa/recovery-codes/generate` | POST   | Generate new recovery codes  |
+| `/api/mfa/recovery-codes/verify`   | POST   | Verify recovery code         |
+
+#### **Enable 2FA Flow**
+
+1. **User requests 2FA setup** via `/api/mfa/enable`
+2. **System generates**:
+   - Secret key for TOTP
+   - QR code for easy setup
+   - 10 recovery codes
+3. **User scans QR code** with authenticator app
+4. **User verifies setup** with first TOTP code
+5. **2FA is activated** for the account
+
+#### **Login with 2FA**
+
+```json
+{
+  "email": "user@example.com",
+  "password": "userpassword",
+  "twoFactorCode": "123456"
+}
+```
+
+If 2FA is enabled and no code is provided, login will fail with a specific error message.
+
+#### **Recovery Codes**
+
+- **10 single-use codes** generated during 2FA setup
+- **Can be regenerated** at any time
+- **Automatically tracked** (used/unused status)
+- **Secure storage** in database
 
 ## Project Structure
 
@@ -83,7 +145,6 @@ During the refactoring process, the following duplicate files were removed from 
 - ❌ **Models/**: Entity models moved to `PassFort.DAL`, DTOs moved to `PassFort.DTO`
 - ❌ **Data/**: DbContext moved to `PassFort.DAL`
 - ❌ **Old Migrations**: Regenerated with correct namespace references in `PassFort.DAL`
-- ❌ **MfaController**: Temporarily removed until MfaService is implemented in BLL
 
 The API layer now contains only presentation-specific code (controllers, middleware, configuration).
 
@@ -135,6 +196,8 @@ DTO ← DTO ← DTO
 - **JWT**: Authentication tokens
 - **BCrypt**: Password hashing
 - **Identity**: User management
+- **OTP.NET**: TOTP implementation
+- **QRCoder**: QR code generation
 
 ## Getting Started
 
@@ -155,7 +218,7 @@ DTO ← DTO ← DTO
 4. Build and run:
    ```bash
    dotnet build
-   #startup your docker daemon and run the below cmd to spin up a database
+   # Startup your docker daemon and run the below cmd to spin up a database
    docker compose up -d
    dotnet run --project PassFort.API
    ```
@@ -163,12 +226,61 @@ DTO ← DTO ← DTO
 ## Security Features
 
 - JWT-based authentication
+- **Multi-Factor Authentication (2FA/TOTP)**
+- **Recovery codes for account recovery**
 - Refresh token rotation
 - Token blacklisting
 - Password hashing with BCrypt
 - Account lockout after failed attempts
 - CORS configuration
 - Input validation
+
+## 🔐 MFA Usage Examples
+
+### Enable 2FA
+
+```bash
+curl -X POST "https://localhost:7001/api/mfa/enable" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "password": "your_current_password"
+  }'
+```
+
+**Response:**
+
+```json
+{
+  "sharedKey": "ABCD EFGH IJKL MNOP",
+  "authenticatorUri": "otpauth://totp/PassFort:user@example.com?secret=ABCDEFGHIJKLMNOP&issuer=PassFort",
+  "recoveryCodes": ["abc123", "def456", ...],
+  "qrCodeUri": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA..."
+}
+```
+
+### Verify 2FA Code
+
+```bash
+curl -X POST "https://localhost:7001/api/mfa/verify" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "code": "123456"
+  }'
+```
+
+### Login with 2FA
+
+```bash
+curl -X POST "https://localhost:7001/api/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "password": "userpassword",
+    "twoFactorCode": "123456"
+  }'
+```
 
 ## Development Guidelines
 
@@ -188,3 +300,11 @@ DTO ← DTO ← DTO
 - Add comprehensive logging
 - Write unit tests for each layer
 - Use async/await for database operations
+
+## 📱 MFA Setup Guide
+
+1. **Enable 2FA** via API or future web interface
+2. **Scan QR code** with your authenticator app
+3. **Enter verification code** to confirm setup
+4. **Save recovery codes** in a secure location
+5. **Use 2FA codes** during login

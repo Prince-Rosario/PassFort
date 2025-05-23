@@ -11,6 +11,7 @@ namespace PassFort.DAL.Data
 
         public DbSet<RefreshToken> RefreshTokens { get; set; }
         public DbSet<BlacklistedToken> BlacklistedTokens { get; set; }
+        public DbSet<UserRecoveryCode> UserRecoveryCodes { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -48,12 +49,28 @@ namespace PassFort.DAL.Data
                     .OnDelete(DeleteBehavior.Cascade);
             });
 
+            // Configure UserRecoveryCode
+            builder.Entity<UserRecoveryCode>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Code).IsRequired().HasMaxLength(50);
+                entity.Property(e => e.UserId).IsRequired();
+                entity.HasIndex(e => new { e.UserId, e.Code }).IsUnique();
+
+                entity
+                    .HasOne(e => e.User)
+                    .WithMany(u => u.RecoveryCodes)
+                    .HasForeignKey(e => e.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
             // Configure ApplicationUser additional properties
             builder.Entity<ApplicationUser>(entity =>
             {
                 entity.Property(e => e.MasterPasswordHash).HasMaxLength(500);
                 entity.Property(e => e.MasterPasswordSalt).HasMaxLength(500);
                 entity.Property(e => e.RecoveryKey).HasMaxLength(500);
+                entity.Property(e => e.TwoFactorSecretKey).HasMaxLength(500);
             });
         }
     }
