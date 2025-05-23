@@ -127,11 +127,27 @@ public class MfaService : IMfaService
             throw new InvalidOperationException("User not found");
         }
 
+        // Check if 2FA is enabled
+        if (!user.TwoFactorEnabled || string.IsNullOrEmpty(user.TwoFactorSecretKey))
+        {
+            throw new InvalidOperationException("Two-factor authentication is not enabled");
+        }
+
         // Verify the user's password before disabling 2FA
         var passwordValid = await _userManager.CheckPasswordAsync(user, request.Password);
         if (!passwordValid)
         {
             throw new UnauthorizedAccessException("Invalid password");
+        }
+
+        // Verify the 2FA code before disabling 2FA
+        var twoFactorValid =
+            VerifyTotpCode(user.TwoFactorSecretKey, request.TwoFactorCode)
+            || await VerifyRecoveryCodeAsync(userId, request.TwoFactorCode);
+
+        if (!twoFactorValid)
+        {
+            throw new UnauthorizedAccessException("Invalid two-factor authentication code");
         }
 
         // Disable 2FA

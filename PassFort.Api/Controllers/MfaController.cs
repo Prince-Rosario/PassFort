@@ -257,11 +257,4 @@ namespace PassFort.API.Controllers
             }
         }
     }
-
-    // Additional DTO for recovery code verification
-    public class VerifyRecoveryCodeRequestDto
-    {
-        [Required]
-        public string RecoveryCode { get; set; } = string.Empty;
-    }
 }

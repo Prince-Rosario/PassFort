@@ -26,6 +26,9 @@ namespace PassFort.DTO.DTOs
     {
         [Required]
         public string Password { get; set; } = string.Empty;
+
+        [Required]
+        public string TwoFactorCode { get; set; } = string.Empty;
     }
 
     public class TwoFactorStatusDto
@@ -33,5 +36,11 @@ namespace PassFort.DTO.DTOs
         public bool IsEnabled { get; set; }
         public bool HasRecoveryCodes { get; set; }
         public int RecoveryCodesLeft { get; set; }
+    }
+
+    public class VerifyRecoveryCodeRequestDto
+    {
+        [Required]
+        public string RecoveryCode { get; set; } = string.Empty;
     }
 }
