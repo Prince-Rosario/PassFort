@@ -16,13 +16,13 @@ This application follows the **Layered Architecture** pattern, which separates c
 └─────────────────┬───────────────────┘
                   │
 ┌─────────────────▼───────────────────┐
-│         Business Logic Layer       │
+│         Business Logic Layer        │
 │            (PassFort.BLL)           │
 │      Services, Business Rules       │
 └─────────────────┬───────────────────┘
                   │
 ┌─────────────────▼───────────────────┐
-│         Data Access Layer          │
+│         Data Access Layer           │
 │            (PassFort.DAL)           │
 │    Repositories, DbContext          │
 └─────────────────┬───────────────────┘
@@ -137,17 +137,6 @@ If 2FA is enabled and no code is provided, login will fail with a specific error
   - Data validation attributes
 - **Contains**: DTOs, Configuration classes
 
-## ✅ Refactoring Cleanup
-
-During the refactoring process, the following duplicate files were removed from `PassFort.API`:
-
-- ❌ **Services/**: All service implementations moved to `PassFort.BLL`
-- ❌ **Models/**: Entity models moved to `PassFort.DAL`, DTOs moved to `PassFort.DTO`
-- ❌ **Data/**: DbContext moved to `PassFort.DAL`
-- ❌ **Old Migrations**: Regenerated with correct namespace references in `PassFort.DAL`
-
-The API layer now contains only presentation-specific code (controllers, middleware, configuration).
-
 ## Key Benefits of Layered Architecture
 
 ### ✅ Separation of Concerns
@@ -174,19 +163,6 @@ The API layer now contains only presentation-specific code (controllers, middlew
 - Easier onboarding for new developers
 - Consistent coding patterns
 
-## Dependencies Flow
-
-```
-API → BLL → DAL → Database
- ↓     ↓     ↓
-DTO ← DTO ← DTO
-```
-
-- **API Layer** depends on BLL and DTO
-- **BLL Layer** depends on DAL and DTO
-- **DAL Layer** depends on DTO
-- **DTO Layer** has no dependencies (pure data contracts)
-
 ## Technologies Used
 
 - **.NET 9**: Latest .NET framework
@@ -205,7 +181,7 @@ DTO ← DTO ← DTO
 
 - .NET 9 SDK
 - PostgreSQL database
-- Visual Studio or VS Code
+- Editor of choice
 
 ### Setup
 
@@ -281,25 +257,6 @@ curl -X POST "https://localhost:7001/api/auth/login" \
     "twoFactorCode": "123456"
   }'
 ```
-
-## Development Guidelines
-
-### Adding New Features
-
-1. Define DTOs in `PassFort.DTO`
-2. Create repository interfaces in `PassFort.DAL`
-3. Implement business logic in `PassFort.BLL`
-4. Add controllers in `PassFort.API`
-5. Register dependencies in `Program.cs`
-
-### Best Practices
-
-- Use dependency injection
-- Follow SOLID principles
-- Implement proper error handling
-- Add comprehensive logging
-- Write unit tests for each layer
-- Use async/await for database operations
 
 ## 📱 MFA Setup Guide
 
