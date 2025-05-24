@@ -68,7 +68,9 @@ namespace PassFort.DAL.Repositories
         public async Task RevokeAllUserTokensAsync(string userId)
         {
             var userTokens = await _context
-                .RefreshTokens.Where(rt => rt.UserId == userId && rt.IsActive)
+                .RefreshTokens.Where(rt =>
+                    rt.UserId == userId && !rt.IsRevoked && rt.ExpiryDate > DateTime.UtcNow
+                )
                 .ToListAsync();
 
             foreach (var token in userTokens)

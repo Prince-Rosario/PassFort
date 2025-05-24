@@ -17,7 +17,7 @@ namespace PassFort.BLL.Mappers
                 CreatedAt = user.CreatedAt,
                 LastLoginAt = user.LastLoginAt,
                 IsLocked = user.IsLocked,
-                FailedLoginAttempts = user.FailedLoginAttempts,
+                FailedLoginAttempts = user.FailedLoginAttempts, //TODO
             };
         }
 
