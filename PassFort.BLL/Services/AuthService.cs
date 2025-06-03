@@ -32,7 +32,7 @@ namespace PassFort.BLL.Services
             _recoveryCodeRepository = recoveryCodeRepository;
         }
 
-        public async Task<TokenResponseDto> RegisterAsync(RegisterRequestDto request)
+        public async Task<RegisterResponseDto> RegisterAsync(RegisterRequestDto request)
         {
             var existingUser = await _userManager.FindByEmailAsync(request.Email);
             if (existingUser != null)
@@ -52,14 +52,11 @@ namespace PassFort.BLL.Services
                 throw new InvalidOperationException($"User registration failed: {errors}");
             }
 
-            var jwtToken = await _tokenService.GenerateJwtTokenAsync(user);
-            var refreshToken = await _tokenService.GenerateRefreshTokenAsync(user.Id);
-
-            return new TokenResponseDto
+            // Do not generate tokens during registration - only return user info
+            return new RegisterResponseDto
             {
-                AccessToken = jwtToken,
-                RefreshToken = refreshToken.Token,
-                ExpiresAt = DateTime.UtcNow.AddMinutes(60),
+                Success = true,
+                Message = "User registered successfully. Please log in to access your account.",
                 User = UserMapper.ToDto(user),
             };
         }
