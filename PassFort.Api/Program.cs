@@ -89,11 +89,15 @@ else
 builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 builder.Services.AddScoped<IBlacklistedTokenRepository, BlacklistedTokenRepository>();
 builder.Services.AddScoped<IUserRecoveryCodeRepository, UserRecoveryCodeRepository>();
+builder.Services.AddScoped<IVaultRepository, VaultRepository>();
+builder.Services.AddScoped<IVaultItemRepository, VaultItemRepository>();
+builder.Services.AddScoped<IVaultFolderRepository, VaultFolderRepository>();
 
 // Register Business Logic Layer (BLL)
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IMfaService, MfaService>();
+builder.Services.AddScoped<IVaultService, VaultService>();
 
 // CORS Configuration
 builder.Services.AddCors(options =>

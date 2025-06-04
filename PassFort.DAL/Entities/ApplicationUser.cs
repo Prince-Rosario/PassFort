@@ -27,5 +27,6 @@ namespace PassFort.DAL.Entities
             new List<BlacklistedToken>();
         public virtual ICollection<UserRecoveryCode> RecoveryCodes { get; set; } =
             new List<UserRecoveryCode>();
+        public virtual ICollection<Vault> Vaults { get; set; } = new List<Vault>();
     }
 }
