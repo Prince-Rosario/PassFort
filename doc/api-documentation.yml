@@ -1,0 +1,612 @@
+openapi: 3.0.4
+info:
+  title: PassFort.API
+  version: "1.0"
+paths:
+  /api/Auth/register:
+    post:
+      tags:
+        - Auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequestDto"
+          text/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequestDto"
+          application/*+json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequestDto"
+      responses:
+        "200":
+          description: OK
+  /api/Auth/login:
+    post:
+      tags:
+        - Auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequestDto"
+          text/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequestDto"
+          application/*+json:
+            schema:
+              $ref: "#/components/schemas/LoginRequestDto"
+      responses:
+        "200":
+          description: OK
+  /api/Auth/refresh-token:
+    post:
+      tags:
+        - Auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshTokenRequestDto"
+          text/json:
+            schema:
+              $ref: "#/components/schemas/RefreshTokenRequestDto"
+          application/*+json:
+            schema:
+              $ref: "#/components/schemas/RefreshTokenRequestDto"
+      responses:
+        "200":
+          description: OK
+  /api/Auth/logout:
+    post:
+      tags:
+        - Auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshTokenRequestDto"
+          text/json:
+            schema:
+              $ref: "#/components/schemas/RefreshTokenRequestDto"
+          application/*+json:
+            schema:
+              $ref: "#/components/schemas/RefreshTokenRequestDto"
+      responses:
+        "200":
+          description: OK
+  /api/Auth/change-password:
+    post:
+      tags:
+        - Auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangePasswordRequestDto"
+          text/json:
+            schema:
+              $ref: "#/components/schemas/ChangePasswordRequestDto"
+          application/*+json:
+            schema:
+              $ref: "#/components/schemas/ChangePasswordRequestDto"
+      responses:
+        "200":
+          description: OK
+  /api/Auth/user:
+    get:
+      tags:
+        - Auth
+      responses:
+        "200":
+          description: OK
+  /api/Auth/revoke-all-tokens:
+    post:
+      tags:
+        - Auth
+      responses:
+        "200":
+          description: OK
+  /api/Mfa/enable:
+    post:
+      tags:
+        - Mfa
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnableTwoFactorRequestDto"
+          text/json:
+            schema:
+              $ref: "#/components/schemas/EnableTwoFactorRequestDto"
+          application/*+json:
+            schema:
+              $ref: "#/components/schemas/EnableTwoFactorRequestDto"
+      responses:
+        "200":
+          description: OK
+  /api/Mfa/verify:
+    post:
+      tags:
+        - Mfa
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerifyTwoFactorRequestDto"
+          text/json:
+            schema:
+              $ref: "#/components/schemas/VerifyTwoFactorRequestDto"
+          application/*+json:
+            schema:
+              $ref: "#/components/schemas/VerifyTwoFactorRequestDto"
+      responses:
+        "200":
+          description: OK
+  /api/Mfa/disable:
+    post:
+      tags:
+        - Mfa
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DisableTwoFactorRequestDto"
+          text/json:
+            schema:
+              $ref: "#/components/schemas/DisableTwoFactorRequestDto"
+          application/*+json:
+            schema:
+              $ref: "#/components/schemas/DisableTwoFactorRequestDto"
+      responses:
+        "200":
+          description: OK
+  /api/Mfa/status:
+    get:
+      tags:
+        - Mfa
+      responses:
+        "200":
+          description: OK
+  /api/Mfa/recovery-codes/generate:
+    post:
+      tags:
+        - Mfa
+      responses:
+        "200":
+          description: OK
+  /api/Mfa/recovery-codes/verify:
+    post:
+      tags:
+        - Mfa
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerifyRecoveryCodeRequestDto"
+          text/json:
+            schema:
+              $ref: "#/components/schemas/VerifyRecoveryCodeRequestDto"
+          application/*+json:
+            schema:
+              $ref: "#/components/schemas/VerifyRecoveryCodeRequestDto"
+      responses:
+        "200":
+          description: OK
+  /api/Vault:
+    post:
+      tags:
+        - Vault
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateVaultRequestDto"
+          text/json:
+            schema:
+              $ref: "#/components/schemas/CreateVaultRequestDto"
+          application/*+json:
+            schema:
+              $ref: "#/components/schemas/CreateVaultRequestDto"
+      responses:
+        "200":
+          description: OK
+    get:
+      tags:
+        - Vault
+      responses:
+        "200":
+          description: OK
+  /api/Vault/{vaultId}:
+    get:
+      tags:
+        - Vault
+      parameters:
+        - name: vaultId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: OK
+    put:
+      tags:
+        - Vault
+      parameters:
+        - name: vaultId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateVaultRequestDto"
+          text/json:
+            schema:
+              $ref: "#/components/schemas/UpdateVaultRequestDto"
+          application/*+json:
+            schema:
+              $ref: "#/components/schemas/UpdateVaultRequestDto"
+      responses:
+        "200":
+          description: OK
+    delete:
+      tags:
+        - Vault
+      parameters:
+        - name: vaultId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: OK
+  /api/Vault/{vaultId}/items:
+    post:
+      tags:
+        - Vault
+      parameters:
+        - name: vaultId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateVaultItemRequestDto"
+          text/json:
+            schema:
+              $ref: "#/components/schemas/CreateVaultItemRequestDto"
+          application/*+json:
+            schema:
+              $ref: "#/components/schemas/CreateVaultItemRequestDto"
+      responses:
+        "200":
+          description: OK
+    get:
+      tags:
+        - Vault
+      parameters:
+        - name: vaultId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: itemType
+          in: query
+          schema:
+            type: string
+        - name: folderId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: favoritesOnly
+          in: query
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          description: OK
+  /api/Vault/{vaultId}/items/{itemId}:
+    get:
+      tags:
+        - Vault
+      parameters:
+        - name: vaultId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: OK
+    put:
+      tags:
+        - Vault
+      parameters:
+        - name: vaultId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateVaultItemRequestDto"
+          text/json:
+            schema:
+              $ref: "#/components/schemas/UpdateVaultItemRequestDto"
+          application/*+json:
+            schema:
+              $ref: "#/components/schemas/UpdateVaultItemRequestDto"
+      responses:
+        "200":
+          description: OK
+    delete:
+      tags:
+        - Vault
+      parameters:
+        - name: vaultId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: OK
+  /api/Vault/{vaultId}/items/{itemId}/toggle-favorite:
+    post:
+      tags:
+        - Vault
+      parameters:
+        - name: vaultId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: OK
+components:
+  schemas:
+    ChangePasswordRequestDto:
+      required:
+        - confirmNewPassword
+        - currentPassword
+        - newPassword
+      type: object
+      properties:
+        currentPassword:
+          minLength: 1
+          type: string
+        newPassword:
+          maxLength: 100
+          minLength: 8
+          type: string
+        confirmNewPassword:
+          minLength: 1
+          type: string
+      additionalProperties: false
+    CreateVaultItemRequestDto:
+      required:
+        - encryptedData
+        - itemType
+        - vaultId
+      type: object
+      properties:
+        vaultId:
+          type: string
+          format: uuid
+        folderId:
+          type: string
+          format: uuid
+          nullable: true
+        itemType:
+          minLength: 1
+          type: string
+        encryptedData:
+          minLength: 1
+          type: string
+        searchableTitle:
+          maxLength: 500
+          type: string
+          nullable: true
+      additionalProperties: false
+    CreateVaultRequestDto:
+      required:
+        - encryptedData
+        - name
+      type: object
+      properties:
+        name:
+          maxLength: 500
+          minLength: 1
+          type: string
+        description:
+          maxLength: 1000
+          type: string
+          nullable: true
+        encryptedData:
+          minLength: 1
+          type: string
+      additionalProperties: false
+    DisableTwoFactorRequestDto:
+      required:
+        - password
+        - twoFactorCode
+      type: object
+      properties:
+        password:
+          minLength: 1
+          type: string
+        twoFactorCode:
+          minLength: 1
+          type: string
+      additionalProperties: false
+    EnableTwoFactorRequestDto:
+      required:
+        - password
+      type: object
+      properties:
+        password:
+          minLength: 1
+          type: string
+      additionalProperties: false
+    LoginRequestDto:
+      required:
+        - email
+        - password
+      type: object
+      properties:
+        email:
+          minLength: 1
+          type: string
+          format: email
+        password:
+          minLength: 1
+          type: string
+        rememberMe:
+          type: boolean
+        twoFactorCode:
+          type: string
+          nullable: true
+      additionalProperties: false
+    RefreshTokenRequestDto:
+      required:
+        - refreshToken
+      type: object
+      properties:
+        refreshToken:
+          minLength: 1
+          type: string
+      additionalProperties: false
+    RegisterRequestDto:
+      required:
+        - confirmPassword
+        - email
+        - masterPassword
+        - password
+      type: object
+      properties:
+        email:
+          minLength: 1
+          type: string
+          format: email
+        password:
+          maxLength: 100
+          minLength: 8
+          type: string
+        confirmPassword:
+          minLength: 1
+          type: string
+        masterPassword:
+          minLength: 1
+          type: string
+      additionalProperties: false
+    UpdateVaultItemRequestDto:
+      required:
+        - encryptedData
+        - id
+        - itemType
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        folderId:
+          type: string
+          format: uuid
+          nullable: true
+        itemType:
+          minLength: 1
+          type: string
+        encryptedData:
+          minLength: 1
+          type: string
+        searchableTitle:
+          maxLength: 500
+          type: string
+          nullable: true
+      additionalProperties: false
+    UpdateVaultRequestDto:
+      required:
+        - encryptedData
+        - id
+        - name
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          maxLength: 500
+          minLength: 1
+          type: string
+        description:
+          maxLength: 1000
+          type: string
+          nullable: true
+        encryptedData:
+          minLength: 1
+          type: string
+      additionalProperties: false
+    VerifyRecoveryCodeRequestDto:
+      required:
+        - recoveryCode
+      type: object
+      properties:
+        recoveryCode:
+          minLength: 1
+          type: string
+      additionalProperties: false
+    VerifyTwoFactorRequestDto:
+      required:
+        - code
+      type: object
+      properties:
+        code:
+          minLength: 1
+          type: string
+      additionalProperties: false
