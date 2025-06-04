@@ -40,7 +40,7 @@ namespace PassFort.API.Controllers
             {
                 return StatusCode(
                     500,
-                    new { message = "An error occurred during registration", details = ex.Message }
+                    new { message = "An error occurred reg", details = ex.Message }
                 );
             }
         }
