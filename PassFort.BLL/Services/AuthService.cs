@@ -45,7 +45,8 @@ namespace PassFort.BLL.Services
             user.MasterPasswordSalt = Guid.NewGuid().ToString();
             user.RecoveryKey = Guid.NewGuid().ToString("N");
 
-            var result = await _userManager.CreateAsync(user, request.Password);
+            // Use master password for both Identity authentication and vault encryption
+            var result = await _userManager.CreateAsync(user, request.MasterPassword);
             if (!result.Succeeded)
             {
                 var errors = string.Join(", ", result.Errors.Select(e => e.Description));
@@ -76,7 +77,7 @@ namespace PassFort.BLL.Services
 
             var result = await _signInManager.CheckPasswordSignInAsync(
                 user,
-                request.Password,
+                request.MasterPassword,
                 lockoutOnFailure: false
             );
             if (!result.Succeeded)
@@ -162,14 +163,18 @@ namespace PassFort.BLL.Services
 
             var result = await _userManager.ChangePasswordAsync(
                 user,
-                request.CurrentPassword,
-                request.NewPassword
+                request.CurrentMasterPassword,
+                request.NewMasterPassword
             );
             if (!result.Succeeded)
             {
                 var errors = string.Join(", ", result.Errors.Select(e => e.Description));
-                throw new InvalidOperationException($"Password change failed: {errors}");
+                throw new InvalidOperationException($"Master password change failed: {errors}");
             }
+
+            // Update the master password hash for vault encryption
+            user.MasterPasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewMasterPassword);
+            await _userManager.UpdateAsync(user);
 
             await _tokenService.RevokeAllUserTokensAsync(userId);
             return true;

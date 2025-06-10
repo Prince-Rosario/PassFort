@@ -107,7 +107,12 @@ builder.Services.AddCors(options =>
         builder =>
         {
             builder
-                .WithOrigins("http://localhost:8080", "http://127.0.0.1:8080")
+                .WithOrigins(
+                    "http://localhost:3000", // React frontend
+                    "http://localhost:8080",
+                    "http://127.0.0.1:8080",
+                    "http://127.0.0.1:3000"
+                )
                 .AllowAnyMethod()
                 .AllowAnyHeader()
                 .AllowCredentials();

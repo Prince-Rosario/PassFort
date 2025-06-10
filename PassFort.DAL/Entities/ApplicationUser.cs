@@ -9,6 +9,8 @@ namespace PassFort.DAL.Entities
         public override bool TwoFactorEnabled { get; set; } = false;
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime? LastLoginAt { get; set; }
+        public string? FirstName { get; set; }
+        public string? LastName { get; set; }
         public string? MasterPasswordHash { get; set; }
         public string? MasterPasswordSalt { get; set; }
         public string? RecoveryKey { get; set; }

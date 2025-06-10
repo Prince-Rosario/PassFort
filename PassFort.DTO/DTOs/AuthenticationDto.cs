@@ -9,7 +9,7 @@ namespace PassFort.DTO.DTOs
         public string Email { get; set; } = string.Empty;
 
         [Required]
-        public string Password { get; set; } = string.Empty;
+        public string MasterPassword { get; set; } = string.Empty;
 
         public bool RememberMe { get; set; } = false;
 
@@ -24,15 +24,18 @@ namespace PassFort.DTO.DTOs
         public string Email { get; set; } = string.Empty;
 
         [Required]
-        [StringLength(100, MinimumLength = 8)]
-        public string Password { get; set; } = string.Empty;
-
-        [Required]
-        [Compare("Password")]
-        public string ConfirmPassword { get; set; } = string.Empty;
-
-        [Required]
+        [StringLength(100, MinimumLength = 12)]
         public string MasterPassword { get; set; } = string.Empty;
+
+        [Required]
+        [Compare("MasterPassword")]
+        public string ConfirmMasterPassword { get; set; } = string.Empty;
+
+        [Required]
+        public string FirstName { get; set; } = string.Empty;
+
+        [Required]
+        public string LastName { get; set; } = string.Empty;
     }
 
     public class TokenResponseDto
@@ -59,14 +62,14 @@ namespace PassFort.DTO.DTOs
     public class ChangePasswordRequestDto
     {
         [Required]
-        public string CurrentPassword { get; set; } = string.Empty;
+        public string CurrentMasterPassword { get; set; } = string.Empty;
 
         [Required]
-        [StringLength(100, MinimumLength = 8)]
-        public string NewPassword { get; set; } = string.Empty;
+        [StringLength(100, MinimumLength = 12)]
+        public string NewMasterPassword { get; set; } = string.Empty;
 
         [Required]
-        [Compare("NewPassword")]
-        public string ConfirmNewPassword { get; set; } = string.Empty;
+        [Compare("NewMasterPassword")]
+        public string ConfirmNewMasterPassword { get; set; } = string.Empty;
     }
 }
