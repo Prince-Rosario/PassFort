@@ -9,7 +9,7 @@ namespace PassFort.DTO.DTOs
         public string Email { get; set; } = string.Empty;
 
         [Required]
-        public string Password { get; set; } = string.Empty;
+        public string MasterPasswordHash { get; set; } = string.Empty;
 
         public bool RememberMe { get; set; } = false;
 
@@ -24,15 +24,21 @@ namespace PassFort.DTO.DTOs
         public string Email { get; set; } = string.Empty;
 
         [Required]
-        [StringLength(100, MinimumLength = 8)]
-        public string Password { get; set; } = string.Empty;
+        [StringLength(100, MinimumLength = 12)]
+        public string MasterPasswordHash { get; set; } = string.Empty;
 
         [Required]
-        [Compare("Password")]
-        public string ConfirmPassword { get; set; } = string.Empty;
+        [Compare("MasterPasswordHash")]
+        public string ConfirmMasterPasswordHash { get; set; } = string.Empty;
 
         [Required]
-        public string MasterPassword { get; set; } = string.Empty;
+        public string FirstName { get; set; } = string.Empty;
+
+        [Required]
+        public string LastName { get; set; } = string.Empty;
+        
+        // Security level used for password hashing
+        public string SecurityLevel { get; set; } = "balanced";
     }
 
     public class TokenResponseDto
@@ -59,14 +65,42 @@ namespace PassFort.DTO.DTOs
     public class ChangePasswordRequestDto
     {
         [Required]
-        public string CurrentPassword { get; set; } = string.Empty;
+        public string CurrentMasterPasswordHash { get; set; } = string.Empty;
 
         [Required]
-        [StringLength(100, MinimumLength = 8)]
-        public string NewPassword { get; set; } = string.Empty;
+        [StringLength(100, MinimumLength = 12)]
+        public string NewMasterPasswordHash { get; set; } = string.Empty;
 
         [Required]
-        [Compare("NewPassword")]
-        public string ConfirmNewPassword { get; set; } = string.Empty;
+        [Compare("NewMasterPasswordHash")]
+        public string ConfirmNewMasterPasswordHash { get; set; } = string.Empty;
+        
+        // New security level (if changing)
+        public string? NewSecurityLevel { get; set; }
+    }
+
+    public class ChangeSecurityLevelRequestDto
+    {
+        [Required]
+        public string CurrentMasterPasswordHash { get; set; } = string.Empty;
+
+        [Required]
+        [StringLength(100, MinimumLength = 12)]
+        public string NewMasterPasswordHash { get; set; } = string.Empty;
+
+        [Required]
+        public string NewSecurityLevel { get; set; } = string.Empty;
+    }
+
+    public class SecurityLevelRequestDto
+    {
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; } = string.Empty;
+    }
+
+    public class SecurityLevelResponseDto
+    {
+        public string SecurityLevel { get; set; } = string.Empty;
     }
 }

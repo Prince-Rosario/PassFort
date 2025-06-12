@@ -197,6 +197,65 @@ namespace PassFort.API.Controllers
             }
         }
 
+        [HttpPost("security-level")]
+        public async Task<IActionResult> GetSecurityLevel([FromBody] SecurityLevelRequestDto request)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(ModelState);
+                }
+
+                var securityLevel = await _authService.GetUserSecurityLevelAsync(request.Email);
+                return Ok(new SecurityLevelResponseDto { SecurityLevel = securityLevel });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(
+                    500,
+                    new { message = "An error occurred while retrieving security level", details = ex.Message }
+                );
+            }
+        }
+
+        [HttpPost("change-security-level")]
+        [Authorize]
+        public async Task<IActionResult> ChangeSecurityLevel([FromBody] ChangeSecurityLevelRequestDto request)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                {
+                    return BadRequest(ModelState);
+                }
+
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (string.IsNullOrEmpty(userId))
+                {
+                    return Unauthorized(new { message = "User not authenticated" });
+                }
+
+                var result = await _authService.ChangeSecurityLevelAsync(userId, request);
+                return Ok(new { success = result, message = "Security level changed successfully" });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(
+                    500,
+                    new { message = "An error occurred while changing security level", details = ex.Message }
+                );
+            }
+        }
+
         [HttpPost("revoke-all-tokens")]
         [Authorize]
         public async Task<IActionResult> RevokeAllTokens()

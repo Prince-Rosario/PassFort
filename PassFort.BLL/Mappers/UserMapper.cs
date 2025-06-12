@@ -12,12 +12,15 @@ namespace PassFort.BLL.Mappers
                 Id = user.Id,
                 UserName = user.UserName,
                 Email = user.Email,
+                FirstName = user.FirstName,
+                LastName = user.LastName,
                 EmailConfirmed = user.EmailConfirmed,
                 TwoFactorEnabled = user.TwoFactorEnabled,
                 CreatedAt = user.CreatedAt,
                 LastLoginAt = user.LastLoginAt,
                 IsLocked = user.IsLocked,
-                FailedLoginAttempts = user.FailedLoginAttempts, //TODO
+                FailedLoginAttempts = user.FailedLoginAttempts,
+                SecurityLevel = user.SecurityLevel ?? "balanced",
             };
         }
 
@@ -27,8 +30,11 @@ namespace PassFort.BLL.Mappers
             {
                 UserName = dto.Email, // Using email as username
                 Email = dto.Email,
+                FirstName = dto.FirstName,
+                LastName = dto.LastName,
                 SecurityStamp = Guid.NewGuid().ToString(),
                 CreatedAt = DateTime.UtcNow,
+                SecurityLevel = dto.SecurityLevel ?? "balanced",
             };
         }
     }

@@ -41,11 +41,13 @@ namespace PassFort.BLL.Services
             }
 
             var user = UserMapper.ToEntity(request);
-            user.MasterPasswordHash = BCrypt.Net.BCrypt.HashPassword(request.MasterPassword);
+            user.MasterPasswordHash = BCrypt.Net.BCrypt.HashPassword(request.MasterPasswordHash);
             user.MasterPasswordSalt = Guid.NewGuid().ToString();
             user.RecoveryKey = Guid.NewGuid().ToString("N");
 
-            var result = await _userManager.CreateAsync(user, request.Password);
+            // Zero-knowledge registration: Create user without password for Identity
+            // The derived hash is already stored in user.MasterPasswordHash
+            var result = await _userManager.CreateAsync(user);
             if (!result.Succeeded)
             {
                 var errors = string.Join(", ", result.Errors.Select(e => e.Description));
@@ -74,12 +76,9 @@ namespace PassFort.BLL.Services
                 throw new UnauthorizedAccessException("Account is locked. Please contact support.");
             }
 
-            var result = await _signInManager.CheckPasswordSignInAsync(
-                user,
-                request.Password,
-                lockoutOnFailure: false
-            );
-            if (!result.Succeeded)
+            // Zero-knowledge authentication: verify the derived hash, not raw password
+            var isValidHash = BCrypt.Net.BCrypt.Verify(request.MasterPasswordHash, user.MasterPasswordHash);
+            if (!isValidHash)
             {
                 user.FailedLoginAttempts++;
                 if (user.FailedLoginAttempts >= 5)
@@ -160,17 +159,18 @@ namespace PassFort.BLL.Services
                 throw new InvalidOperationException("User not found");
             }
 
-            var result = await _userManager.ChangePasswordAsync(
-                user,
-                request.CurrentPassword,
-                request.NewPassword
-            );
-            if (!result.Succeeded)
+            // Zero-knowledge authentication: verify current password hash
+            var isCurrentPasswordValid = BCrypt.Net.BCrypt.Verify(request.CurrentMasterPasswordHash, user.MasterPasswordHash);
+            if (!isCurrentPasswordValid)
             {
-                var errors = string.Join(", ", result.Errors.Select(e => e.Description));
-                throw new InvalidOperationException($"Password change failed: {errors}");
+                throw new InvalidOperationException("Current master password is incorrect");
             }
 
+            // Update the master password hash for vault encryption
+            user.MasterPasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewMasterPasswordHash);
+            await _userManager.UpdateAsync(user);
+
+            // Revoke all existing tokens to force re-authentication
             await _tokenService.RevokeAllUserTokensAsync(userId);
             return true;
         }
@@ -189,6 +189,44 @@ namespace PassFort.BLL.Services
         public async Task<bool> RevokeAllTokensAsync(string userId)
         {
             return await _tokenService.RevokeAllUserTokensAsync(userId);
+        }
+
+        public async Task<string> GetUserSecurityLevelAsync(string email)
+        {
+            var user = await _userManager.FindByEmailAsync(email);
+            if (user == null)
+            {
+                throw new InvalidOperationException("User not found");
+            }
+
+            return user.SecurityLevel ?? "balanced"; // Default to balanced if not set
+        }
+
+        public async Task<bool> ChangeSecurityLevelAsync(string userId, ChangeSecurityLevelRequestDto request)
+        {
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null)
+            {
+                throw new InvalidOperationException("User not found");
+            }
+
+            // Verify current password hash (derived with current security level)
+            var isCurrentPasswordValid = BCrypt.Net.BCrypt.Verify(request.CurrentMasterPasswordHash, user.MasterPasswordHash);
+            if (!isCurrentPasswordValid)
+            {
+                throw new InvalidOperationException("Current master password is incorrect");
+            }
+
+            // Update both the security level and the password hash (derived with new security level)
+            user.SecurityLevel = request.NewSecurityLevel;
+            user.MasterPasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewMasterPasswordHash);
+            
+            await _userManager.UpdateAsync(user);
+
+            // Revoke all existing tokens to force re-authentication with new security level
+            await _tokenService.RevokeAllUserTokensAsync(userId);
+            
+            return true;
         }
 
         #region Private 2FA Helper Methods

@@ -9,9 +9,14 @@ namespace PassFort.DAL.Entities
         public override bool TwoFactorEnabled { get; set; } = false;
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime? LastLoginAt { get; set; }
+        public string? FirstName { get; set; }
+        public string? LastName { get; set; }
         public string? MasterPasswordHash { get; set; }
         public string? MasterPasswordSalt { get; set; }
         public string? RecoveryKey { get; set; }
+        
+        // Security level used for password hashing (scrypt parameters)
+        public string SecurityLevel { get; set; } = "balanced"; // Default to balanced
         public bool IsLocked { get; set; } = false;
         public int FailedLoginAttempts { get; set; } = 0;
 

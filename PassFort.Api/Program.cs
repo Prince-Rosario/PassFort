@@ -66,7 +66,7 @@ if (appSettings != null)
         .AddJwtBearer(options =>
         {
             options.SaveToken = true;
-            options.RequireHttpsMetadata = false;
+            options.RequireHttpsMetadata = !builder.Environment.IsDevelopment(); // Require HTTPS in production
             options.TokenValidationParameters = new TokenValidationParameters
             {
                 ValidateIssuer = true,
@@ -99,18 +99,67 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IMfaService, MfaService>();
 builder.Services.AddScoped<IVaultService, VaultService>();
 
-// CORS Configuration
+// CORS Configuration - Secure for password manager
 builder.Services.AddCors(options =>
 {
     options.AddPolicy(
         "AllowSpecificOrigins",
-        builder =>
+        corsBuilder =>
         {
-            builder
-                .WithOrigins("http://localhost:8080", "http://127.0.0.1:8080")
-                .AllowAnyMethod()
-                .AllowAnyHeader()
-                .AllowCredentials();
+            if (builder.Environment.IsDevelopment())
+            {
+                // Development - Allow localhost and ngrok origins
+                corsBuilder
+                    .WithOrigins(
+                        // Local development
+                        "http://localhost:3000", // React frontend
+                        "http://localhost:8080",
+                        "http://127.0.0.1:8080",
+                        "http://127.0.0.1:3000",
+                        "https://localhost:3000", // HTTPS local
+                        "https://127.0.0.1:3000",
+                        
+                        // ngrok tunnels
+                        "https://2b53-164-92-155-6.ngrok-free.app", // Your current ngrok URL
+                        
+                        // Network testing
+                        "http://10.210.79.74:3000", // Mac IP for mobile testing
+                        "http://10.33.0.2:3000"     // Alternative Mac IP for mobile testing
+                    )
+                    .SetIsOriginAllowed(origin =>
+                    {
+                        // Allow any ngrok domain in development
+                        if (string.IsNullOrEmpty(origin)) return false;
+                        
+                        var uri = new Uri(origin);
+                        return uri.Host.EndsWith(".ngrok.io") || 
+                               uri.Host.EndsWith(".ngrok-free.app") || 
+                               uri.Host.EndsWith(".ngrok.app") ||
+                               uri.Host.EndsWith(".ngrok.dev") ||
+                               uri.Host == "localhost" ||
+                               uri.Host == "127.0.0.1" ||
+                               uri.Host.StartsWith("10.") ||
+                               uri.Host.StartsWith("192.168.");
+                    })
+                    .AllowAnyMethod()
+                    .AllowAnyHeader()
+                    .AllowCredentials();
+            }
+            else
+            {
+                // Production - Restrict to specific domains
+                corsBuilder
+                    .WithOrigins(
+                        "https://passfort.com",
+                        "https://www.passfort.com",
+                        "https://app.passfort.com"
+                        // Add your production domains here
+                    )
+                    .WithMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+                    .WithHeaders("Content-Type", "Authorization", "X-Requested-With")
+                    .AllowCredentials()
+                    .SetPreflightMaxAge(TimeSpan.FromMinutes(10));
+            }
         }
     );
 });
@@ -125,6 +174,9 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+// Add security headers middleware - should be early in pipeline
+app.UseSecurityHeaders();
 
 // Global CORS policy
 app.UseCors("AllowSpecificOrigins");

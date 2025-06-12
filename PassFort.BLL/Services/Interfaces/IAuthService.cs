@@ -11,5 +11,7 @@ namespace PassFort.BLL.Services.Interfaces
         Task<bool> ChangePasswordAsync(string userId, ChangePasswordRequestDto request);
         Task<UserDto> GetUserAsync(string userId);
         Task<bool> RevokeAllTokensAsync(string userId);
+        Task<string> GetUserSecurityLevelAsync(string email);
+        Task<bool> ChangeSecurityLevelAsync(string userId, ChangeSecurityLevelRequestDto request);
     }
 }
