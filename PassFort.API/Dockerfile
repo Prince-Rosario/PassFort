@@ -4,16 +4,16 @@ FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
 
 # Copy csproj files and restore dependencies
-COPY ["PassFort.Api/PassFort.API.csproj", "PassFort.Api/"]
+COPY ["PassFort.API/PassFort.API.csproj", "PassFort.API/"]
 COPY ["PassFort.BLL/PassFort.BLL.csproj", "PassFort.BLL/"]
 COPY ["PassFort.DAL/PassFort.DAL.csproj", "PassFort.DAL/"]
 COPY ["PassFort.DTO/PassFort.DTO.csproj", "PassFort.DTO/"]
 
-RUN dotnet restore "PassFort.Api/PassFort.API.csproj"
+RUN dotnet restore "PassFort.API/PassFort.API.csproj"
 
 # Copy everything else and build
 COPY . .
-WORKDIR "/src/PassFort.Api"
+WORKDIR "/src/PassFort.API"
 RUN dotnet build "PassFort.API.csproj" -c Release -o /app/build
 
 FROM build AS publish
