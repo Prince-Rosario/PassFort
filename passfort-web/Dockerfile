@@ -3,7 +3,7 @@ FROM oven/bun:1.1.13-alpine AS build
 WORKDIR /app
 
 # Copy package files
-COPY package.json bun.lockb ./
+COPY passfort-web/package.json passfort-web/bun.lockb ./
 
 # Install dependencies using bun
 RUN bun install --frozen-lockfile
