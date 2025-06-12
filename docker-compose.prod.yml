@@ -3,7 +3,7 @@ version: '3.8'
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: passfort-postgres
+    container_name: passfort-database
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
@@ -49,8 +49,8 @@ services:
 
   passfort-web:
     build:
-      context: ./passfort-web
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: passfort-web/Dockerfile
     container_name: passfort-web
     restart: unless-stopped
     ports:
