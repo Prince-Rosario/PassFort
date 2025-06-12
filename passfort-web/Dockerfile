@@ -1,4 +1,4 @@
-FROM node:20-alpine AS build
+FROM oven/bun:1.1.13-alpine AS build
 
 WORKDIR /app
 
@@ -6,7 +6,6 @@ WORKDIR /app
 COPY package.json bun.lockb ./
 
 # Install dependencies using bun
-RUN npm install -g bun
 RUN bun install --frozen-lockfile
 
 # Copy source code
