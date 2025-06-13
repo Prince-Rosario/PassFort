@@ -4,6 +4,7 @@ namespace PassFort.BLL.Services.Interfaces
 {
     public interface IMfaService
     {
+        Task<TwoFactorSetupDto> GenerateTwoFactorSetupAsync(string userId);
         Task<EnableTwoFactorResponseDto> EnableTwoFactorAsync(
             string userId,
             EnableTwoFactorRequestDto request

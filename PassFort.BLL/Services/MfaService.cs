@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using BCrypt.Net;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
 using OtpNet;
@@ -29,6 +30,40 @@ public class MfaService : IMfaService
         _jwtSettings = jwtSettings.Value;
     }
 
+    public async Task<TwoFactorSetupDto> GenerateTwoFactorSetupAsync(string userId)
+    {
+        var user = await _userManager.FindByIdAsync(userId);
+        if (user == null)
+        {
+            throw new InvalidOperationException("User not found");
+        }
+
+        // Check if 2FA is already enabled
+        if (user.TwoFactorEnabled)
+        {
+            throw new InvalidOperationException("Two-factor authentication is already enabled");
+        }
+
+        // Generate a new secret key
+        var secretKey = GenerateSecretKey();
+
+        // Generate QR code
+        var issuer = _jwtSettings.Issuer ?? "PassFort";
+        var accountTitle = user.Email ?? user.UserName ?? "User";
+        var qrCodeUri = GenerateQrCodeUri(secretKey, accountTitle, issuer);
+        var qrCodeBase64 = GenerateQrCodeImage(qrCodeUri);
+
+        // Store the temporary secret key (not yet enabled)
+        user.TwoFactorSecretKey = secretKey;
+        await _userManager.UpdateAsync(user);
+
+        return new TwoFactorSetupDto
+        {
+            SecretKey = FormatSecretKey(secretKey),
+            QrCodeUrl = qrCodeBase64
+        };
+    }
+
     public async Task<EnableTwoFactorResponseDto> EnableTwoFactorAsync(
         string userId,
         EnableTwoFactorRequestDto request
@@ -40,28 +75,27 @@ public class MfaService : IMfaService
             throw new InvalidOperationException("User not found");
         }
 
-        // Verify the user's password before enabling 2FA
-        var passwordValid = await _userManager.CheckPasswordAsync(user, request.Password);
+        // Verify the user's master password hash before enabling 2FA (ZERO-KNOWLEDGE)
+        var passwordValid = VerifyPasswordHash(user.MasterPasswordHash, request.MasterPasswordHash);
         if (!passwordValid)
         {
-            throw new UnauthorizedAccessException("Invalid password");
+            throw new UnauthorizedAccessException("Invalid master password");
         }
 
-        // Check if 2FA is already enabled
-        if (user.TwoFactorEnabled)
+        // Check if we have a secret key from setup
+        if (string.IsNullOrEmpty(user.TwoFactorSecretKey))
         {
-            throw new InvalidOperationException("Two-factor authentication is already enabled");
+            throw new InvalidOperationException("No 2FA setup found. Please run setup first.");
         }
 
-        // Generate a new secret key
-        var secretKey = GenerateSecretKey();
-        user.TwoFactorSecretKey = secretKey;
+        // Verify the 2FA code
+        if (!VerifyTotpCode(user.TwoFactorSecretKey, request.VerificationCode))
+        {
+            throw new UnauthorizedAccessException("Invalid verification code");
+        }
 
         // Generate recovery codes
         var recoveryCodes = GenerateRecoveryCodes();
-
-        // Save the secret key to the user
-        await _userManager.UpdateAsync(user);
 
         // Save recovery codes to database
         var recoveryCodeEntities = recoveryCodes
@@ -75,22 +109,25 @@ public class MfaService : IMfaService
 
         await _recoveryCodeRepository.AddRangeAsync(recoveryCodeEntities);
 
-        // Update recovery codes count
+        // Enable 2FA
+        user.TwoFactorEnabled = true;
+        user.TwoFactorEnabledAt = DateTime.UtcNow;
         user.RecoveryCodesRemaining = recoveryCodes.Length;
         await _userManager.UpdateAsync(user);
 
-        // Generate QR code
+        // Generate QR code for response
         var issuer = _jwtSettings.Issuer ?? "PassFort";
         var accountTitle = user.Email ?? user.UserName ?? "User";
-        var qrCodeUri = GenerateQrCodeUri(secretKey, accountTitle, issuer);
+        var qrCodeUri = GenerateQrCodeUri(user.TwoFactorSecretKey, accountTitle, issuer);
         var qrCodeBase64 = GenerateQrCodeImage(qrCodeUri);
 
         return new EnableTwoFactorResponseDto
         {
-            SharedKey = FormatSecretKey(secretKey),
-            AuthenticatorUri = qrCodeUri,
+            Success = true,
+            Message = "Two-factor authentication enabled successfully",
+            SecretKey = FormatSecretKey(user.TwoFactorSecretKey),
+            QrCodeUrl = qrCodeBase64,
             RecoveryCodes = recoveryCodes,
-            QrCodeUri = qrCodeBase64,
         };
     }
 
@@ -105,13 +142,6 @@ public class MfaService : IMfaService
         // Try to verify as TOTP code first
         if (VerifyTotpCode(user.TwoFactorSecretKey, request.Code))
         {
-            // If this is the first verification, enable 2FA
-            if (!user.TwoFactorEnabled)
-            {
-                user.TwoFactorEnabled = true;
-                user.TwoFactorEnabledAt = DateTime.UtcNow;
-                await _userManager.UpdateAsync(user);
-            }
             return true;
         }
 
@@ -133,17 +163,17 @@ public class MfaService : IMfaService
             throw new InvalidOperationException("Two-factor authentication is not enabled");
         }
 
-        // Verify the user's password before disabling 2FA
-        var passwordValid = await _userManager.CheckPasswordAsync(user, request.Password);
+        // Verify the user's master password hash before disabling 2FA (ZERO-KNOWLEDGE)
+        var passwordValid = VerifyPasswordHash(user.MasterPasswordHash, request.MasterPasswordHash);
         if (!passwordValid)
         {
-            throw new UnauthorizedAccessException("Invalid password");
+            throw new UnauthorizedAccessException("Invalid master password");
         }
 
         // Verify the 2FA code before disabling 2FA
         var twoFactorValid =
-            VerifyTotpCode(user.TwoFactorSecretKey, request.TwoFactorCode)
-            || await VerifyRecoveryCodeAsync(userId, request.TwoFactorCode);
+            VerifyTotpCode(user.TwoFactorSecretKey, request.VerificationCode)
+            || await VerifyRecoveryCodeAsync(userId, request.VerificationCode);
 
         if (!twoFactorValid)
         {
@@ -223,50 +253,54 @@ public class MfaService : IMfaService
     public async Task<bool> VerifyRecoveryCodeAsync(string userId, string recoveryCode)
     {
         var user = await _userManager.FindByIdAsync(userId);
-        if (user == null || !user.TwoFactorEnabled)
+        if (user == null)
         {
             return false;
         }
 
-        var recoveryCodeEntity = await _recoveryCodeRepository.GetByUserIdAndCodeAsync(
+        // Find and verify the recovery code
+        var validRecoveryCode = await _recoveryCodeRepository.GetByUserIdAndCodeAsync(
             userId,
             recoveryCode
         );
-        if (recoveryCodeEntity == null)
+
+        if (validRecoveryCode != null && !validRecoveryCode.IsUsed)
         {
-            return false;
+            // Mark the recovery code as used
+            validRecoveryCode.IsUsed = true;
+            validRecoveryCode.UsedAt = DateTime.UtcNow;
+            await _recoveryCodeRepository.UpdateAsync(validRecoveryCode);
+
+            // Update the remaining count
+            user.RecoveryCodesRemaining = Math.Max(0, user.RecoveryCodesRemaining - 1);
+            await _userManager.UpdateAsync(user);
+
+            return true;
         }
 
-        // Mark the recovery code as used
-        recoveryCodeEntity.IsUsed = true;
-        recoveryCodeEntity.UsedAt = DateTime.UtcNow;
-        await _recoveryCodeRepository.UpdateAsync(recoveryCodeEntity);
-
-        // Update the remaining count
-        user.RecoveryCodesRemaining = Math.Max(0, user.RecoveryCodesRemaining - 1);
-        await _userManager.UpdateAsync(user);
-
-        return true;
+        return false;
     }
 
     #region Private Helper Methods
 
     private static string GenerateSecretKey()
     {
-        var key = KeyGeneration.GenerateRandomKey(20); // 160-bit key
+        var key = KeyGeneration.GenerateRandomKey(20);
         return Base32Encoding.ToString(key);
     }
 
     private static string[] GenerateRecoveryCodes()
     {
-        var codes = new string[10]; // Generate 10 recovery codes
-        using var rng = RandomNumberGenerator.Create();
+        const int codeCount = 10;
+        const int codeLength = 8;
+        var codes = new string[codeCount];
 
-        for (int i = 0; i < codes.Length; i++)
+        using var rng = RandomNumberGenerator.Create();
+        for (int i = 0; i < codeCount; i++)
         {
-            var bytes = new byte[5]; // 40 bits = 8 characters in base32
+            var bytes = new byte[codeLength / 2];
             rng.GetBytes(bytes);
-            codes[i] = Base32Encoding.ToString(bytes).Replace("=", "").ToLower();
+            codes[i] = Convert.ToHexString(bytes).ToLowerInvariant();
         }
 
         return codes;
@@ -278,7 +312,7 @@ public class MfaService : IMfaService
         {
             var keyBytes = Base32Encoding.ToBytes(secretKey);
             var totp = new Totp(keyBytes);
-            return totp.VerifyTotp(code, out _, VerificationWindow.RfcSpecifiedNetworkDelay);
+            return totp.VerifyTotp(code, out _);
         }
         catch
         {
@@ -295,22 +329,31 @@ public class MfaService : IMfaService
     {
         using var qrGenerator = new QRCodeGenerator();
         using var qrCodeData = qrGenerator.CreateQrCode(qrCodeUri, QRCodeGenerator.ECCLevel.Q);
-        using var qrCode = new PngByteQRCode(qrCodeData);
-        var qrCodeBytes = qrCode.GetGraphic(20);
-        return Convert.ToBase64String(qrCodeBytes);
+        using var qrCode = new Base64QRCode(qrCodeData);
+        return $"data:image/png;base64,{qrCode.GetGraphic(20)}";
     }
 
     private static string FormatSecretKey(string secretKey)
     {
-        // Format the secret key in groups of 4 characters for easier manual entry
         var formatted = new StringBuilder();
         for (int i = 0; i < secretKey.Length; i += 4)
         {
-            if (i > 0)
-                formatted.Append(' ');
+            if (i > 0) formatted.Append(' ');
             formatted.Append(secretKey.Substring(i, Math.Min(4, secretKey.Length - i)));
         }
         return formatted.ToString();
+    }
+
+    private static bool VerifyPasswordHash(string? storedBcryptHash, string providedHash)
+    {
+        // ZERO-KNOWLEDGE: Verify the provided derived hash against the stored BCrypt hash
+        // The provided hash is derived from Scrypt, the stored hash is BCrypt-hashed
+        if (string.IsNullOrEmpty(storedBcryptHash))
+        {
+            return false;
+        }
+        
+        return BCrypt.Net.BCrypt.Verify(providedHash, storedBcryptHash);
     }
 
     #endregion

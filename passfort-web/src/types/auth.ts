@@ -8,6 +8,7 @@ export interface User {
   createdAt: string;
   updatedAt: string;
   securityLevel: string;
+  twoFactorEnabled: boolean;
 }
 
 // Frontend login request (contains raw master password for key derivation)

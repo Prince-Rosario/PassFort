@@ -14,6 +14,7 @@ interface AuthStore extends AuthState {
   refreshAuth: () => Promise<void>;
   clearError: () => void;
   setLoading: (loading: boolean) => void;
+  updateUser: (userData: any) => void;
 }
 
 export const useAuthStore = create<AuthStore>()(
@@ -38,6 +39,14 @@ export const useAuthStore = create<AuthStore>()(
           const { securityLevel } = await apiClient.getUserSecurityLevel(credentials.email);
           console.log(`📋 User security level: ${securityLevel.toUpperCase()}`);
 
+          // Additional debug info
+          console.log('🔐 Login credentials check:', {
+            hasEmail: !!credentials.email,
+            hasPassword: !!credentials.masterPassword,
+            hasTwoFactorCode: !!credentials.twoFactorCode,
+            securityLevel: securityLevel
+          });
+
           console.log('🔐 Deriving authentication hash with user security level...');
 
           // Derive authentication hash using the user's stored security level
@@ -61,7 +70,18 @@ export const useAuthStore = create<AuthStore>()(
           const encryptionKey = await deriveEncryptionKey(credentials.email, credentials.masterPassword, securityLevel as any);
 
           // Store encryption key securely in memory
-          SecureKeyManager.getInstance().setEncryptionKey(encryptionKey);
+          const keyManager = SecureKeyManager.getInstance();
+          keyManager.setEncryptionKey(encryptionKey);
+
+          // Verify key was stored correctly
+          const storedKey = keyManager.getEncryptionKey();
+          console.log('🔐 Encryption key storage verification:', {
+            keyDerived: !!encryptionKey,
+            keyStored: !!storedKey,
+            keysMatch: encryptionKey === storedKey,
+            keyAlgorithm: storedKey?.algorithm,
+            keyUsages: storedKey?.usages
+          });
 
           console.log('✅ Zero-knowledge login complete!');
 
@@ -113,7 +133,7 @@ export const useAuthStore = create<AuthStore>()(
             lastName: userData.lastName,
             masterPasswordHash: authHash,
             confirmMasterPasswordHash: confirmAuthHash,
-            securityLevel: getSecurityLevel(), // Use current security level setting
+            securityLevel: getSecurityLevel(), // Always BALANCED for consistency
           };
 
           const response = await apiClient.register(secureUserData);
@@ -265,6 +285,12 @@ export const useAuthStore = create<AuthStore>()(
 
       setLoading: (loading: boolean) => {
         set({ isLoading: loading });
+      },
+
+      updateUser: (userData: any) => {
+        set((state) => ({
+          user: state.user ? { ...state.user, ...userData } : null
+        }));
       },
     }),
     {

@@ -60,73 +60,14 @@ const SCRYPT_CONFIGS = {
 const AUTH_SALT_SUFFIX = 'auth';
 const ENCRYPTION_SALT_SUFFIX = 'encryption';
 
-// Default security level (can be configured by user)
-let currentSecurityLevel: SecurityLevel = SecurityLevel.BALANCED;
+// Fixed security level to prevent vault decryption issues
+const FIXED_SECURITY_LEVEL: SecurityLevel = SecurityLevel.BALANCED;
 
 /**
- * Sets the security level for key derivation
- */
-export function setSecurityLevel(level: SecurityLevel): void {
-    currentSecurityLevel = level;
-    console.log(`🔐 Security level set to: ${level.toUpperCase()}`);
-    const config = SCRYPT_CONFIGS[level];
-    console.log(`   Memory: ${config.memoryMiB} MiB, Est. time: ${config.estimatedMs}ms`);
-}
-
-/**
- * Gets the current security level configuration
+ * Gets the security level (always BALANCED for consistency)
  */
 export function getSecurityLevel(): SecurityLevel {
-    return currentSecurityLevel;
-}
-
-/**
- * Gets all available security levels with their specifications
- */
-export function getSecurityLevels(): Record<SecurityLevel, typeof SCRYPT_CONFIGS[SecurityLevel]> {
-    return SCRYPT_CONFIGS;
-}
-
-/**
- * Detects optimal security level based on device capabilities
- */
-export async function detectOptimalSecurityLevel(): Promise<SecurityLevel> {
-    // Check available memory (if supported)
-    const memoryInfo = (navigator as any).deviceMemory;
-    const hardwareConcurrency = navigator.hardwareConcurrency || 1;
-
-    // Performance-based detection with a quick benchmark
-    const startTime = performance.now();
-    const testPassword = 'benchmark-test-password';
-    const testSalt = new TextEncoder().encode('test-salt');
-
-    try {
-        // Quick benchmark with FAST settings
-        await scrypt(
-            new TextEncoder().encode(testPassword),
-            testSalt,
-            SCRYPT_CONFIGS[SecurityLevel.FAST].N,
-            SCRYPT_CONFIGS[SecurityLevel.FAST].r,
-            SCRYPT_CONFIGS[SecurityLevel.FAST].p,
-            32
-        );
-
-        const benchmarkTime = performance.now() - startTime;
-
-        // Device capability heuristics
-        if (memoryInfo && memoryInfo >= 8 && hardwareConcurrency >= 4 && benchmarkTime < 100) {
-            return SecurityLevel.MAXIMUM; // High-end device
-        } else if (memoryInfo && memoryInfo >= 4 && hardwareConcurrency >= 2 && benchmarkTime < 200) {
-            return SecurityLevel.STRONG; // Mid-range device
-        } else if (benchmarkTime < 300) {
-            return SecurityLevel.BALANCED; // Standard device
-        } else {
-            return SecurityLevel.FAST; // Low-end device
-        }
-    } catch (error) {
-        console.warn('Security level detection failed, using BALANCED:', error);
-        return SecurityLevel.BALANCED;
-    }
+    return FIXED_SECURITY_LEVEL;
 }
 
 /**
@@ -145,7 +86,7 @@ function deriveSalt(email: string, suffix: string): Uint8Array {
 export async function deriveAuthHash(email: string, masterPassword: string, securityLevel?: SecurityLevel): Promise<string> {
     const salt = deriveSalt(email, AUTH_SALT_SUFFIX);
     const passwordBytes = new TextEncoder().encode(masterPassword);
-    const levelToUse = securityLevel || currentSecurityLevel;
+    const levelToUse = securityLevel || FIXED_SECURITY_LEVEL;
     const config = SCRYPT_CONFIGS[levelToUse];
 
     console.log(`🔐 Deriving auth hash with ${levelToUse.toUpperCase()} security (${config.memoryMiB} MiB)`);
@@ -174,7 +115,7 @@ export async function deriveAuthHash(email: string, masterPassword: string, secu
 export async function deriveEncryptionKey(email: string, masterPassword: string, securityLevel?: SecurityLevel): Promise<CryptoKey> {
     const salt = deriveSalt(email, ENCRYPTION_SALT_SUFFIX);
     const passwordBytes = new TextEncoder().encode(masterPassword);
-    const levelToUse = securityLevel || currentSecurityLevel;
+    const levelToUse = securityLevel || FIXED_SECURITY_LEVEL;
     const config = SCRYPT_CONFIGS[levelToUse];
 
     console.log(`🔐 Deriving encryption key with ${levelToUse.toUpperCase()} security`);

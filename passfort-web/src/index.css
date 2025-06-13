@@ -2,12 +2,38 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Dark mode theme-aware toast styles */
+[data-sonner-toaster] [data-sonner-toast] {
+  @apply bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700 shadow-lg;
+}
+
+[data-sonner-toaster] [data-sonner-toast][data-type="success"] {
+  @apply bg-green-50 dark:bg-green-900/30 text-green-900 dark:text-green-100 border-green-200 dark:border-green-800;
+}
+
+[data-sonner-toaster] [data-sonner-toast][data-type="error"] {
+  @apply bg-red-50 dark:bg-red-900/30 text-red-900 dark:text-red-100 border-red-200 dark:border-red-800;
+}
+
+/* React Hot Toast theme styles */
+.Toaster__toast {
+  @apply bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700 shadow-lg;
+}
+
+.Toaster__toast--success {
+  @apply bg-green-50 dark:bg-green-900/30 text-green-900 dark:text-green-100 border-green-200 dark:border-green-800;
+}
+
+.Toaster__toast--error {
+  @apply bg-red-50 dark:bg-red-900/30 text-red-900 dark:text-red-100 border-red-200 dark:border-red-800;
+}
 
 /* Global styles for the password manager */
 body {
   font-family: system-ui, -apple-system, sans-serif;
   margin: 0;
   min-height: 100vh;
+  @apply bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100;
 }
 
 /* Custom component styles */
@@ -60,4 +86,17 @@ body {
 
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
   background-color: rgba(156, 163, 175, 0.7);
+}
+
+/* Dark mode scrollbar adjustments */
+.dark .scrollbar-thin {
+  scrollbar-color: rgba(75, 85, 99, 0.5) transparent;
+}
+
+.dark .scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: rgba(75, 85, 99, 0.5);
+}
+
+.dark .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(75, 85, 99, 0.7);
 }

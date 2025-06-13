@@ -7,24 +7,26 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   error?: string;
   hint?: string;
+  helperText?: string;
   isRequired?: boolean;
   showPasswordToggle?: boolean;
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ 
-    label, 
-    error, 
-    hint, 
-    isRequired, 
-    showPasswordToggle, 
+  ({
+    label,
+    error,
+    hint,
+    helperText,
+    isRequired,
+    showPasswordToggle,
     type = 'text',
     className = '',
-    ...props 
+    ...props
   }, ref) => {
     const [showPassword, setShowPassword] = useState(false);
-    
-    const inputType = showPasswordToggle && type === 'password' 
+
+    const inputType = showPasswordToggle && type === 'password'
       ? (showPassword ? 'text' : 'password')
       : type;
 
@@ -36,7 +38,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             {isRequired && <span className="text-red-500 ml-1">*</span>}
           </label>
         )}
-        
+
         <div className="relative">
           <input
             ref={ref}
@@ -49,7 +51,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             `}
             {...props}
           />
-          
+
           {showPasswordToggle && type === 'password' && (
             <button
               type="button"
@@ -65,16 +67,22 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             </button>
           )}
         </div>
-        
+
         {error && (
           <p className="text-sm text-red-600 dark:text-red-400" role="alert">
             {error}
           </p>
         )}
-        
+
         {hint && !error && (
           <p className="text-sm text-gray-500 dark:text-gray-400">
             {hint}
+          </p>
+        )}
+
+        {helperText && !error && (
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            {helperText}
           </p>
         )}
       </div>

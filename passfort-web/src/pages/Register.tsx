@@ -11,7 +11,7 @@ import {
   CheckCircleIcon,
   XCircleIcon
 } from '@heroicons/react/24/outline';
-import { SecurityLevel, getSecurityLevels, setSecurityLevel, getSecurityLevel } from '../utils/crypto';
+
 
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
@@ -66,9 +66,6 @@ export const Register: React.FC = () => {
   const { register: registerUser, isLoading, error, clearError, isAuthenticated } = useAuthStore();
   const [masterPassword, setMasterPassword] = useState('');
   const [showRequirements, setShowRequirements] = useState(false);
-  const [selectedSecurityLevel, setSelectedSecurityLevel] = useState<SecurityLevel>(getSecurityLevel());
-
-  const securityLevels = getSecurityLevels();
 
   const {
     register,
@@ -111,23 +108,7 @@ export const Register: React.FC = () => {
 
   const passwordStrength = getPasswordStrength(masterPassword);
 
-  const handleSecurityLevelChange = (level: SecurityLevel) => {
-    setSelectedSecurityLevel(level);
-    setSecurityLevel(level); // Update the global security level for registration
-  };
 
-  const getSecurityDescription = (level: SecurityLevel) => {
-    switch (level) {
-      case SecurityLevel.FAST:
-        return { title: 'Fast', description: 'Quick logins, good for mobile devices', color: 'text-yellow-600' };
-      case SecurityLevel.BALANCED:
-        return { title: 'Balanced', description: 'Recommended for most users', color: 'text-blue-600' };
-      case SecurityLevel.STRONG:
-        return { title: 'Strong', description: 'Enhanced security, moderate performance', color: 'text-green-600' };
-      case SecurityLevel.MAXIMUM:
-        return { title: 'Maximum', description: 'OWASP-compliant maximum security', color: 'text-purple-600' };
-    }
-  };
 
   const onSubmit = async (data: RegisterFormData) => {
     try {
@@ -280,63 +261,7 @@ export const Register: React.FC = () => {
               showPasswordToggle
             />
 
-            {/* Security Level Selection */}
-            <div className="space-y-3">
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Security Level
-              </label>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                Choose your preferred security level. This affects login time and protection strength.
-              </p>
 
-              <div className="space-y-2">
-                {Object.entries(securityLevels).map(([level, config]) => {
-                  const levelKey = level as SecurityLevel;
-                  const description = getSecurityDescription(levelKey);
-                  const isSelected = selectedSecurityLevel === levelKey;
-
-                  return (
-                    <div
-                      key={level}
-                      className={`p-3 border rounded-lg cursor-pointer transition-all ${isSelected
-                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                        : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-                        }`}
-                      onClick={() => handleSecurityLevelChange(levelKey)}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center">
-                          <input
-                            type="radio"
-                            checked={isSelected}
-                            onChange={() => handleSecurityLevelChange(levelKey)}
-                            className="text-blue-600 mr-3"
-                          />
-                          <div>
-                            <h4 className={`font-medium ${description.color}`}>
-                              {description.title}
-                            </h4>
-                            <p className="text-sm text-gray-600 dark:text-gray-400">
-                              {description.description}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="text-right text-sm text-gray-500 dark:text-gray-400">
-                          <div>{config.memoryMiB} MiB</div>
-                          <div>~{config.estimatedMs}ms</div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="bg-amber-50 dark:bg-amber-900/20 p-3 rounded-lg border border-amber-200 dark:border-amber-800">
-                <p className="text-sm text-amber-800 dark:text-amber-200">
-                  <strong>Note:</strong> You can change this later in Settings, but it will require re-entering your master password.
-                </p>
-              </div>
-            </div>
 
             <div className="flex items-start">
               <input

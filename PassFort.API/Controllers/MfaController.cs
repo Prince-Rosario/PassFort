@@ -20,6 +20,33 @@ namespace PassFort.API.Controllers
             _mfaService = mfaService;
         }
 
+        [HttpGet("setup")]
+        public async Task<IActionResult> GetTwoFactorSetup()
+        {
+            try
+            {
+                var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (string.IsNullOrEmpty(userId))
+                {
+                    return Unauthorized(new { message = "User not authenticated" });
+                }
+
+                var setupData = await _mfaService.GenerateTwoFactorSetupAsync(userId);
+                return Ok(setupData);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(
+                    500,
+                    new { message = "An error occurred while generating 2FA setup", details = ex.Message }
+                );
+            }
+        }
+
         [HttpPost("enable")]
         public async Task<IActionResult> EnableTwoFactor(
             [FromBody] EnableTwoFactorRequestDto request
@@ -178,7 +205,7 @@ namespace PassFort.API.Controllers
             }
         }
 
-        [HttpPost("recovery-codes/generate")]
+        [HttpPost("recovery-codes")]
         public async Task<IActionResult> GenerateRecoveryCodes()
         {
             try
@@ -190,9 +217,7 @@ namespace PassFort.API.Controllers
                 }
 
                 var recoveryCodes = await _mfaService.GenerateRecoveryCodesAsync(userId);
-                return Ok(
-                    new { recoveryCodes, message = "New recovery codes generated successfully" }
-                );
+                return Ok(recoveryCodes);
             }
             catch (InvalidOperationException ex)
             {

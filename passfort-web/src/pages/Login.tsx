@@ -10,6 +10,7 @@ import { LockClosedIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
 
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
+import { TwoFactorModal } from '../components/ui/TwoFactorModal';
 import { useAuthStore } from '../store/authStore';
 import type { LoginRequest } from '../types/auth';
 
@@ -31,6 +32,9 @@ export const Login: React.FC = () => {
   const navigate = useNavigate();
   const { login, isLoading, error, clearError, isAuthenticated } = useAuthStore();
   const [rememberMe, setRememberMe] = useState(false);
+  const [showTwoFactorModal, setShowTwoFactorModal] = useState(false);
+  const [pendingCredentials, setPendingCredentials] = useState<LoginRequest | null>(null);
+  const [twoFactorError, setTwoFactorError] = useState('');
 
   const {
     register,
@@ -55,13 +59,30 @@ export const Login: React.FC = () => {
 
   const onSubmit = async (data: LoginFormData) => {
     try {
-      await login(data as LoginRequest);
+      const credentials: LoginRequest = {
+        ...data,
+        rememberMe
+      };
+
+      await login(credentials);
       toast.success('Welcome back to PassFort!');
       navigate('/dashboard', { replace: true });
     } catch (error: any) {
       console.error('Login error:', error);
 
-      // Handle specific error cases
+      // Check if 2FA is required
+      if (error?.message === 'Two-factor authentication code is required') {
+        // Store credentials and show 2FA modal
+        setPendingCredentials({
+          ...data,
+          rememberMe
+        });
+        setShowTwoFactorModal(true);
+        setTwoFactorError('');
+        return;
+      }
+
+      // Handle other specific error cases
       if (error?.status === 401) {
         setError('masterPassword', { message: 'Invalid email or master password' });
       } else if (error?.status === 429) {
@@ -70,6 +91,51 @@ export const Login: React.FC = () => {
         toast.error(error?.message || 'Login failed. Please try again.');
       }
     }
+  };
+
+  const handleTwoFactorSubmit = async (twoFactorCode: string) => {
+    if (!pendingCredentials) return;
+
+    try {
+      console.log('🔐 2FA LOGIN: Submitting code:', {
+        codeLength: twoFactorCode.length,
+        timestamp: new Date().toISOString(),
+        email: pendingCredentials.email
+      });
+
+      const credentialsWithTwoFactor: LoginRequest = {
+        ...pendingCredentials,
+        twoFactorCode
+      };
+
+      await login(credentialsWithTwoFactor);
+
+      // Success - close modal and navigate
+      setShowTwoFactorModal(false);
+      setPendingCredentials(null);
+      setTwoFactorError('');
+      toast.success('Welcome back to PassFort!');
+      navigate('/dashboard', { replace: true });
+    } catch (error: any) {
+      console.error('🚨 2FA verification error:', error);
+
+      // Show error in modal
+      if (error?.message?.includes('Invalid two-factor authentication code')) {
+        setTwoFactorError('Invalid verification code. Please try again.');
+      } else if (error?.message?.includes('Invalid verification code')) {
+        setTwoFactorError('Invalid verification code. Please try again.');
+      } else {
+        setTwoFactorError(error?.message || 'Verification failed. Please try again.');
+      }
+
+      throw error; // Re-throw so modal can handle loading state
+    }
+  };
+
+  const handleTwoFactorModalClose = () => {
+    setShowTwoFactorModal(false);
+    setPendingCredentials(null);
+    setTwoFactorError('');
   };
 
   return (
@@ -192,6 +258,16 @@ export const Login: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Two-Factor Authentication Modal */}
+      <TwoFactorModal
+        isOpen={showTwoFactorModal}
+        onClose={handleTwoFactorModalClose}
+        onSubmit={handleTwoFactorSubmit}
+        isLoading={isLoading}
+        error={twoFactorError}
+        userEmail={pendingCredentials?.email}
+      />
     </div>
   );
 }; 

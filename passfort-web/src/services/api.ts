@@ -9,6 +9,19 @@ import type {
   User
 } from '../types/auth';
 
+import type {
+  CreateVaultRequestDto,
+  UpdateVaultRequestDto,
+  VaultDto,
+  VaultSummaryDto,
+  CreateVaultItemRequestDto,
+  UpdateVaultItemRequestDto,
+  VaultItemDto,
+  CreateVaultResponseDto,
+  CreateVaultItemResponseDto,
+  UpdateVaultItemResponseDto
+} from '../types/vault';
+
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5123/api';
 
 class ApiError extends Error {
@@ -39,6 +52,21 @@ class ApiClient {
 
   private loadTokenFromStorage() {
     if (typeof window !== 'undefined') {
+      // Try to load from the auth store's persist key first
+      try {
+        const authData = localStorage.getItem('passfort-auth');
+        if (authData) {
+          const parsedData = JSON.parse(authData);
+          if (parsedData.state?.accessToken) {
+            this.accessToken = parsedData.state.accessToken;
+            return;
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to parse auth data from storage:', error);
+      }
+
+      // Fallback to direct token storage
       this.accessToken = localStorage.getItem('accessToken');
     }
   }
@@ -74,6 +102,8 @@ class ApiClient {
 
     if (this.accessToken && !endpoint.includes('/Auth/login') && !endpoint.includes('/Auth/register')) {
       headers.Authorization = `Bearer ${this.accessToken}`;
+    } else if (!endpoint.includes('/Auth/login') && !endpoint.includes('/Auth/register') && !endpoint.includes('/Auth/security-level')) {
+      console.warn('No access token available for authenticated endpoint:', endpoint);
     }
 
     // Add timeout to prevent hanging
@@ -163,6 +193,82 @@ class ApiClient {
     return this.request<{ securityLevel: string }>('/Auth/security-level', {
       method: 'POST',
       body: JSON.stringify({ email }),
+    });
+  }
+
+  // VAULT ENDPOINTS - Zero-Knowledge
+
+  // Vault operations
+  async createVault(request: CreateVaultRequestDto): Promise<CreateVaultResponseDto> {
+    return this.request<CreateVaultResponseDto>('/Vault', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+  }
+
+  async getVaults(): Promise<VaultSummaryDto[]> {
+    return this.request<VaultSummaryDto[]>('/Vault');
+  }
+
+  async getVault(vaultId: string): Promise<VaultDto> {
+    return this.request<VaultDto>(`/Vault/${vaultId}`);
+  }
+
+  async updateVault(vaultId: string, request: UpdateVaultRequestDto): Promise<VaultDto> {
+    return this.request<VaultDto>(`/Vault/${vaultId}`, {
+      method: 'PUT',
+      body: JSON.stringify(request),
+    });
+  }
+
+  async deleteVault(vaultId: string): Promise<{ success: boolean; message: string }> {
+    return this.request<{ success: boolean; message: string }>(`/Vault/${vaultId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Vault item operations
+  async createVaultItem(vaultId: string, request: CreateVaultItemRequestDto): Promise<CreateVaultItemResponseDto> {
+    return this.request<CreateVaultItemResponseDto>(`/Vault/${vaultId}/items`, {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+  }
+
+  async getVaultItems(vaultId: string, options?: {
+    itemType?: string;
+    folderId?: string;
+    favoritesOnly?: boolean;
+  }): Promise<VaultItemDto[]> {
+    const params = new URLSearchParams();
+    if (options?.itemType) params.append('itemType', options.itemType);
+    if (options?.folderId) params.append('folderId', options.folderId);
+    if (options?.favoritesOnly) params.append('favoritesOnly', 'true');
+
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return this.request<VaultItemDto[]>(`/Vault/${vaultId}/items${query}`);
+  }
+
+  async getVaultItem(vaultId: string, itemId: string): Promise<VaultItemDto> {
+    return this.request<VaultItemDto>(`/Vault/${vaultId}/items/${itemId}`);
+  }
+
+  async updateVaultItem(itemId: string, request: UpdateVaultItemRequestDto): Promise<UpdateVaultItemResponseDto> {
+    return this.request<UpdateVaultItemResponseDto>(`/Vault/items/${itemId}`, {
+      method: 'PUT',
+      body: JSON.stringify(request),
+    });
+  }
+
+  async deleteVaultItem(vaultId: string, itemId: string): Promise<{ success: boolean; message: string }> {
+    return this.request<{ success: boolean; message: string }>(`/Vault/${vaultId}/items/${itemId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async toggleFavorite(vaultId: string, itemId: string): Promise<VaultItemDto> {
+    return this.request<VaultItemDto>(`/Vault/${vaultId}/items/${itemId}/toggle-favorite`, {
+      method: 'POST',
     });
   }
 
