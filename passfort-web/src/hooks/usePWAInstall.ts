@@ -13,8 +13,26 @@ export const usePWAInstall = () => {
     const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
     const [isInstallable, setIsInstallable] = useState(false);
     const [isInstalled, setIsInstalled] = useState(false);
+    const [isIOS, setIsIOS] = useState(false);
+    const [isMac, setIsMac] = useState(false);
 
     useEffect(() => {
+        // Detect platform and browser
+        const detectPlatform = () => {
+            const userAgent = window.navigator.userAgent.toLowerCase();
+            const platform = window.navigator.platform.toLowerCase();
+
+            // iOS Detection
+            const isIOSDevice = /iphone|ipad|ipod/.test(userAgent);
+            const isSafari = /safari/.test(userAgent) && !/chrome|crios|fxios/.test(userAgent);
+            setIsIOS(isIOSDevice && isSafari);
+
+            // Mac Detection  
+            const isMacDevice = /mac/.test(platform) || /macintosh/.test(userAgent);
+            const isMacSafari = isMacDevice && isSafari && !isIOSDevice;
+            setIsMac(isMacSafari);
+        };
+
         // Check if app is already installed
         const checkIfInstalled = () => {
             const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
@@ -28,14 +46,20 @@ export const usePWAInstall = () => {
             setIsInstalled(isPWA || isIOSPWA);
         };
 
+        detectPlatform();
         checkIfInstalled();
 
-        // Listen for the beforeinstallprompt event
+        // Listen for the beforeinstallprompt event (not available on iOS)
         const handleBeforeInstallPrompt = (e: Event) => {
             e.preventDefault();
             setDeferredPrompt(e as BeforeInstallPromptEvent);
             setIsInstallable(true);
         };
+
+        // For iOS/Mac Safari, check if PWA is installable (not already installed and in Safari)
+        if ((isIOS || isMac) && !isInstalled) {
+            setIsInstallable(true);
+        }
 
         // Listen for app installed event
         const handleAppInstalled = () => {
@@ -77,6 +101,8 @@ export const usePWAInstall = () => {
         isInstallable,
         isInstalled,
         installApp,
-        canInstall: isInstallable && !isInstalled
+        canInstall: isInstallable && !isInstalled,
+        isIOS,
+        isMac
     };
 }; 
