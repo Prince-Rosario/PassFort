@@ -52,34 +52,41 @@ export class OfflineVaultService {
                 console.log('✅ Vault created online and cached offline');
                 return vault;
             } catch (error) {
-                console.warn('⚠️ Online creation failed, falling back to offline');
+                console.warn('⚠️ Online creation failed, falling back to offline:', error);
                 this.isOnline = false;
+                // Continue to offline creation below
             }
         }
 
-        // Offline creation
-        const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        const vault: VaultDto = {
-            id: tempId,
-            name: vaultData.name, // This would be encrypted in real implementation
-            description: vaultData.description || '',
-            encryptedData: '', // This would contain encrypted vault metadata
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            itemCount: 0
-        };
+        try {
+            // Offline creation
+            console.log('📴 Creating vault offline...');
+            const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            const vault: VaultDto = {
+                id: tempId,
+                name: vaultData.name, // This would be encrypted in real implementation
+                description: vaultData.description || '',
+                encryptedData: '', // This would contain encrypted vault metadata
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                itemCount: 0
+            };
 
-        // Save to offline storage
-        await offlineDB.saveVault(vault, true);
+            // Save to offline storage
+            await offlineDB.saveVault(vault, true);
 
-        // Queue operation for when online
-        await offlineDB.queueOperation({
-            type: 'create_vault',
-            data: vaultData
-        });
+            // Queue operation for when online
+            await offlineDB.queueOperation({
+                type: 'create_vault',
+                data: vaultData
+            });
 
-        console.log('💾 Vault created offline and queued for sync');
-        return vault;
+            console.log('💾 Vault created offline and queued for sync');
+            return vault;
+        } catch (offlineError) {
+            console.error('❌ Failed to create vault offline:', offlineError);
+            throw new Error('Failed to create vault both online and offline');
+        }
     }
 
     async getVaults(): Promise<VaultSummaryDto[]> {
@@ -242,33 +249,40 @@ export class OfflineVaultService {
                 console.log('✅ Item created online and cached offline');
                 return item;
             } catch (error) {
-                console.warn('⚠️ Online creation failed, creating offline');
+                console.warn('⚠️ Online creation failed, creating offline:', error);
                 this.isOnline = false;
+                // Continue to offline creation below
             }
         }
 
-        // Offline creation
-        const tempId = `temp_item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        const item: VaultItemDto = {
-            id: tempId,
-            vaultId,
-            itemType: itemType as any,
-            encryptedData: '', // Would contain encrypted item data
-            searchableTitle: '', // Would contain encrypted title
-            isFavorite: false,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-        };
+        try {
+            // Offline creation
+            console.log('📴 Creating vault item offline...');
+            const tempId = `temp_item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            const item: VaultItemDto = {
+                id: tempId,
+                vaultId,
+                itemType: itemType as any,
+                encryptedData: '', // Would contain encrypted item data
+                searchableTitle: '', // Would contain encrypted title
+                isFavorite: false,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            };
 
-        await offlineDB.saveVaultItem(item, true);
-        await offlineDB.queueOperation({
-            type: 'create_item',
-            vaultId,
-            data: { itemData, itemType }
-        });
+            await offlineDB.saveVaultItem(item, true);
+            await offlineDB.queueOperation({
+                type: 'create_item',
+                vaultId,
+                data: { itemData, itemType }
+            });
 
-        console.log('💾 Item created offline and queued for sync');
-        return item;
+            console.log('💾 Item created offline and queued for sync');
+            return item;
+        } catch (offlineError) {
+            console.error('❌ Failed to create item offline:', offlineError);
+            throw new Error('Failed to create item both online and offline');
+        }
     }
 
     async getVaultItems(vaultId: string): Promise<VaultItemDto[]> {
