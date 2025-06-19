@@ -150,10 +150,11 @@ builder.Services.AddCors(options =>
                 // Production - Restrict to specific domains
                 corsBuilder
                     .WithOrigins(
-                        "https://passfort.com",
-                        "https://www.passfort.com",
-                        "https://app.passfort.com"
-                        // Add your production domains here
+                        "https://passfort-git-init-deployment-prince-rosarios-projects.vercel.app",
+                        "https://passfort-web.vercel.app",
+                        "https://*.vercel.app",
+                        "https://princerosario.tech",
+                        "https://www.princerosario.tech"
                     )
                     .WithMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                     .WithHeaders("Content-Type", "Authorization", "X-Requested-With")
