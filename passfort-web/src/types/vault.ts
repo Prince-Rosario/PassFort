@@ -148,6 +148,9 @@ export interface CreateVaultItemRequestDto {
 }
 
 export interface UpdateVaultItemRequestDto {
+    id: string;
+    folderId?: string;
+    itemType: string;
     encryptedData: string;
     searchableTitle?: string;
 }

@@ -164,7 +164,6 @@ class VaultService {
             : undefined;
 
         const request: UpdateVaultRequestDto = {
-            id: vaultId,
             name: encryptedName,
             description: encryptedDescription,
             encryptedData: encryptedData
@@ -214,18 +213,29 @@ class VaultService {
         return { item, decryptedData };
     }
 
-    async updateVaultItem(itemId: string, itemData: ClientVaultItemData): Promise<VaultItemDto> {
+    async updateVaultItem(vaultId: string, itemId: string, itemData: ClientVaultItemData, itemType: string = 'Password'): Promise<VaultItemDto> {
         console.log('🔐 Updating vault item with zero-knowledge encryption...');
+        console.log('🔍 Debug - vaultId:', vaultId);
+        console.log('🔍 Debug - itemId:', itemId);
 
         const encryptedData = await this.encryptData(itemData);
         const encryptedTitle = await this.encryptData({ value: itemData.title });
 
         const request: UpdateVaultItemRequestDto = {
+            id: itemId,
+            folderId: undefined, // Not supporting folders yet
+            itemType: itemType,
             encryptedData: encryptedData,
             searchableTitle: encryptedTitle
         };
 
-        const response = await apiClient.updateVaultItem(itemId, request);
+        console.log('🔍 Debug - request object:', {
+            id: request.id,
+            encryptedDataLength: request.encryptedData.length,
+            searchableTitleLength: request.searchableTitle?.length
+        });
+
+        const response = await apiClient.updateVaultItem(vaultId, itemId, request);
         console.log('✅ Vault item updated with zero-knowledge encryption');
         return response.vaultItem;
     }

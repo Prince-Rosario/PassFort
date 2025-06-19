@@ -90,9 +90,9 @@ export const Settings: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-            <div className="max-w-7xl mx-auto p-6">
+            <div className="w-full px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
                 {/* Header */}
-                <div className="mb-8">
+                <div className="mb-6 sm:mb-8">
                     <button
                         onClick={() => navigate('/dashboard')}
                         className="inline-flex items-center text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 mb-4 transition-colors"
@@ -101,16 +101,16 @@ export const Settings: React.FC = () => {
                         Back to Dashboard
                     </button>
 
-                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-                        <div className="flex items-center space-x-4">
-                            <div className="h-12 w-12 bg-blue-100 dark:bg-blue-900/20 rounded-lg flex items-center justify-center">
-                                <ShieldCheckIcon className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6">
+                        <div className="flex items-center space-x-3 sm:space-x-4">
+                            <div className="h-10 w-10 sm:h-12 sm:w-12 bg-blue-100 dark:bg-blue-900/20 rounded-lg flex items-center justify-center">
+                                <ShieldCheckIcon className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600 dark:text-blue-400" />
                             </div>
                             <div>
-                                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+                                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
                                     Settings
                                 </h1>
-                                <p className="text-gray-600 dark:text-gray-400">
+                                <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
                                     Manage your PassFort account, security, and preferences
                                 </p>
                             </div>
@@ -118,9 +118,35 @@ export const Settings: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-                    {/* Settings Navigation */}
-                    <div className="lg:col-span-1">
+                {/* Mobile Navigation Tabs */}
+                <div className="lg:hidden mb-6">
+                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-2">
+                        <div className="flex overflow-x-auto space-x-1 scrollbar-thin">
+                            {settingsNav.map((item) => {
+                                const Icon = item.icon;
+                                const isActive = activeSection === item.id;
+
+                                return (
+                                    <button
+                                        key={item.id}
+                                        onClick={() => setActiveSection(item.id)}
+                                        className={`flex-shrink-0 flex flex-col items-center p-3 rounded-lg transition-colors min-w-[80px] ${isActive
+                                            ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
+                                            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                                            }`}
+                                    >
+                                        <Icon className={`h-5 w-5 mb-1 ${isActive ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400'}`} />
+                                        <span className="text-xs font-medium text-center">{item.name}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 lg:gap-8">
+                    {/* Desktop Settings Navigation */}
+                    <div className="hidden lg:block lg:col-span-1">
                         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
                             <nav className="space-y-2">
                                 {settingsNav.map((item) => {

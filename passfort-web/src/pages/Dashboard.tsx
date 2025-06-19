@@ -42,6 +42,7 @@ import { UnlockVaultModal } from '../components/ui/UnlockVaultModal';
 import { SecureKeyManager } from '../utils/crypto';
 import AddItemModal from '../components/vault/AddItemModal';
 import ItemDetailModal from '../components/vault/ItemDetailModal';
+import EditItemModal from '../components/vault/EditItemModal';
 import { getItemTypeConfig } from '../config/itemTypes';
 import { useTheme } from '../hooks/useTheme';
 
@@ -92,6 +93,7 @@ export const Dashboard: React.FC = () => {
     const [showAddItemModal, setShowAddItemModal] = useState(false);
     const [selectedItem, setSelectedItem] = useState<DecryptedVaultItem | null>(null);
     const [showItemDetailModal, setShowItemDetailModal] = useState(false);
+    const [showEditItemModal, setShowEditItemModal] = useState(false);
 
     // Define sidebar categories
     const sidebarCategories: SidebarCategory[] = [
@@ -476,8 +478,10 @@ export const Dashboard: React.FC = () => {
     const categoryCounts = getCategoryCounts();
 
     // Toggle favorite status
-    const toggleFavorite = async (vaultId: string, itemId: string, event: React.MouseEvent) => {
-        event.stopPropagation();
+    const toggleFavorite = async (vaultId: string, itemId: string, event?: React.MouseEvent) => {
+        if (event) {
+            event.stopPropagation();
+        }
         try {
             await vaultService.toggleFavorite(vaultId, itemId);
             // Reload items to reflect the change
@@ -509,9 +513,34 @@ export const Dashboard: React.FC = () => {
         }
     };
 
-    // Edit item (placeholder for now)
+    // Edit item
     const editItem = () => {
-        toast.success('Edit functionality coming soon!');
+        if (selectedItem) {
+            setShowItemDetailModal(false);
+            setShowEditItemModal(true);
+        }
+    };
+
+    // Handle item updated
+    const handleItemUpdated = async () => {
+        if (selectedVault) {
+            await loadVaultItems(selectedVault);
+            // Update the selected item with fresh data
+            if (selectedItem) {
+                const updatedItems = await vaultService.getVaultItems(selectedVault);
+                const updatedItem = updatedItems.find(item => item.id === selectedItem.item.id);
+                if (updatedItem) {
+                    const decryptedData = await vaultService.decryptData<ClientVaultItemData>(updatedItem.encryptedData);
+                    setSelectedItem({ item: updatedItem, decryptedData });
+                }
+            }
+        }
+    };
+
+    // Handle close edit modal
+    const handleCloseEditModal = () => {
+        setShowEditItemModal(false);
+        setShowItemDetailModal(true);
     };
 
     if (isLoading) {
@@ -552,11 +581,23 @@ export const Dashboard: React.FC = () => {
                     decryptedData={selectedItem.decryptedData}
                     onToggleFavorite={() => {
                         if (selectedVault && selectedItem) {
-                            toggleFavorite(selectedVault, selectedItem.item.id, {} as React.MouseEvent);
+                            toggleFavorite(selectedVault, selectedItem.item.id);
                         }
                     }}
                     onEdit={editItem}
                     onDelete={() => setShowDeleteItemConfirm(selectedItem.item.id)}
+                />
+            )}
+
+            {/* Edit Item Modal */}
+            {selectedItem && selectedVault && (
+                <EditItemModal
+                    isOpen={showEditItemModal}
+                    onClose={handleCloseEditModal}
+                    vaultId={selectedVault}
+                    item={selectedItem.item}
+                    decryptedData={selectedItem.decryptedData}
+                    onItemUpdated={handleItemUpdated}
                 />
             )}
 
@@ -627,12 +668,16 @@ export const Dashboard: React.FC = () => {
             )}
 
             <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex">
-                {/* Sidebar */}
+                {/* Sidebar - Mobile: Overlay, Desktop: Fixed */}
                 <div className={`
                     ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-                    lg:translate-x-0 fixed lg:static inset-y-0 left-0 z-50 w-64 bg-white dark:bg-gray-800 
-                    border-r border-gray-200 dark:border-gray-700 transition-transform duration-300 ease-in-out
+                    lg:translate-x-0 fixed lg:static inset-y-0 left-0 z-50 
+                    w-full sm:w-80 lg:w-64 xl:w-72
+                    bg-white dark:bg-gray-800 
+                    border-r border-gray-200 dark:border-gray-700 
+                    transition-transform duration-300 ease-in-out
                     flex flex-col
+                    lg:max-w-xs
                 `}>
                     {/* Sidebar Header */}
                     <div className="p-4 border-b border-gray-200 dark:border-gray-700">
@@ -707,6 +752,10 @@ export const Dashboard: React.FC = () => {
                                                 setSelectedVault(vaultData.vault.id);
                                                 loadVaultItems(vaultData.vault.id);
                                                 setSelectedCategory('all');
+                                                // Auto-close sidebar on mobile after selection
+                                                if (window.innerWidth < 1024) {
+                                                    setIsSidebarOpen(false);
+                                                }
                                             }}
                                             className={`flex-1 text-left p-2 rounded-md text-sm transition-colors ${selectedVault === vaultData.vault.id
                                                 ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
@@ -764,7 +813,13 @@ export const Dashboard: React.FC = () => {
                                 return (
                                     <button
                                         key={category.id}
-                                        onClick={() => setSelectedCategory(category.id)}
+                                        onClick={() => {
+                                            setSelectedCategory(category.id);
+                                            // Auto-close sidebar on mobile after selection
+                                            if (window.innerWidth < 1024) {
+                                                setIsSidebarOpen(false);
+                                            }
+                                        }}
                                         className={`w-full text-left p-2 rounded-md text-sm transition-colors flex items-center justify-between ${selectedCategory === category.id
                                             ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
                                             : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
@@ -788,7 +843,8 @@ export const Dashboard: React.FC = () => {
                         <div className="flex items-center justify-between">
                             <button
                                 onClick={() => changeTheme(theme === 'dark' ? 'light' : 'dark')}
-                                className="p-2 rounded-md text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                                className="p-2 rounded-md text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
                             >
                                 {theme === 'dark' ? (
                                     <SunIcon className="h-5 w-5" />
@@ -798,11 +854,14 @@ export const Dashboard: React.FC = () => {
                             </button>
                             <button
                                 onClick={() => navigate('/settings')}
-                                className="p-2 rounded-md text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                                className="p-2 rounded-md text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                title="Settings"
                             >
                                 <CogIcon className="h-5 w-5" />
                             </button>
-                            <LogoutButton />
+                            <div className="flex items-center">
+                                <LogoutButton />
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -817,50 +876,61 @@ export const Dashboard: React.FC = () => {
 
                 {/* Main Content */}
                 <div className="flex-1 flex flex-col min-w-0">
-                    {/* Top Bar */}
-                    <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-4">
+                    {/* Top Bar - Mobile Optimized */}
+                    <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-3 sm:px-4 py-3">
+                        <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center space-x-3 flex-1 min-w-0">
                                 <button
                                     onClick={() => setIsSidebarOpen(true)}
-                                    className="lg:hidden p-2 rounded-md text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                                    className="lg:hidden p-2 rounded-md text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 flex-shrink-0"
                                 >
                                     <Bars3Icon className="h-5 w-5" />
                                 </button>
 
-                                {/* Search */}
-                                <div className="relative flex-1 max-w-md">
+                                {/* Search - Full width on mobile */}
+                                <div className="relative flex-1 max-w-none lg:max-w-md">
                                     <MagnifyingGlassIcon className="h-5 w-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                                     <Input
                                         type="text"
                                         placeholder="Search in all vaults"
                                         value={searchTerm}
                                         onChange={(e) => setSearchTerm(e.target.value)}
-                                        className="pl-10 bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600"
+                                        className="pl-10 bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600 w-full"
                                     />
                                 </div>
                             </div>
 
-                            <div className="flex items-center space-x-2">
+                            <div className="flex items-center space-x-2 flex-shrink-0">
                                 <Button
                                     variant="primary"
                                     size="sm"
                                     onClick={() => setShowAddItemModal(true)}
                                     leftIcon={<PlusIcon className="h-4 w-4" />}
                                     disabled={!selectedVault}
+                                    className="hidden sm:flex"
                                 >
                                     New Item
+                                </Button>
+                                {/* Mobile: Icon only button */}
+                                <Button
+                                    variant="primary"
+                                    size="sm"
+                                    onClick={() => setShowAddItemModal(true)}
+                                    disabled={!selectedVault}
+                                    className="sm:hidden p-2"
+                                >
+                                    <PlusIcon className="h-4 w-4" />
                                 </Button>
                             </div>
                         </div>
                     </div>
 
-                    {/* Items List */}
+                    {/* Items List - Full width, mobile optimized */}
                     <div className="flex-1 overflow-y-auto">
                         {selectedVault ? (
                             <div className="divide-y divide-gray-200 dark:divide-gray-700">
                                 {filteredItems.length === 0 ? (
-                                    <div className="text-center py-12">
+                                    <div className="text-center py-12 px-4">
                                         <KeyIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                                         <p className="text-gray-500 dark:text-gray-400">
                                             {searchTerm ? 'No items match your search' : 'No items in this category'}
@@ -885,7 +955,7 @@ export const Dashboard: React.FC = () => {
                                             <div
                                                 key={item.id}
                                                 onClick={() => handleItemClick({ item, decryptedData })}
-                                                className="group px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer transition-colors"
+                                                className="group px-3 sm:px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-pointer transition-colors"
                                             >
                                                 <div className="flex items-center space-x-3">
                                                     {/* Item Icon */}
@@ -893,7 +963,7 @@ export const Dashboard: React.FC = () => {
                                                         <IconComponent className="h-4 w-4 text-white" />
                                                     </div>
 
-                                                    {/* Item Info */}
+                                                    {/* Item Info - Better mobile layout */}
                                                     <div className="flex-1 min-w-0">
                                                         <div className="flex items-center space-x-2">
                                                             <h3 className="text-sm font-medium text-gray-900 dark:text-white truncate">
@@ -903,7 +973,7 @@ export const Dashboard: React.FC = () => {
                                                                 <StarIconSolid className="h-3 w-3 text-yellow-500 flex-shrink-0" />
                                                             )}
                                                         </div>
-                                                        <div className="flex items-center space-x-4 mt-1">
+                                                        <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-4 mt-1 space-y-1 sm:space-y-0">
                                                             {decryptedData.username && (
                                                                 <span className="text-xs text-gray-500 dark:text-gray-400 truncate">
                                                                     {decryptedData.username}
@@ -917,8 +987,8 @@ export const Dashboard: React.FC = () => {
                                                         </div>
                                                     </div>
 
-                                                    {/* Quick Actions */}
-                                                    <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    {/* Quick Actions - Mobile optimized */}
+                                                    <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 sm:opacity-100 transition-opacity">
                                                         {/* Favorite Toggle */}
                                                         <button
                                                             onClick={(e) => toggleFavorite(selectedVault!, item.id, e)}
@@ -934,30 +1004,33 @@ export const Dashboard: React.FC = () => {
                                                                 <StarIcon className="h-3 w-3" />
                                                             )}
                                                         </button>
-                                                        {decryptedData.username && (
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    copyToClipboard(decryptedData.username!, 'Username');
-                                                                }}
-                                                                className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
-                                                                title="Copy username"
-                                                            >
-                                                                <UserIcon className="h-3 w-3" />
-                                                            </button>
-                                                        )}
-                                                        {decryptedData.password && (
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    copyToClipboard(decryptedData.password!, 'Password');
-                                                                }}
-                                                                className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
-                                                                title="Copy password"
-                                                            >
-                                                                <KeyIcon className="h-3 w-3" />
-                                                            </button>
-                                                        )}
+                                                        {/* Hide copy buttons on very small screens */}
+                                                        <div className="hidden sm:flex items-center space-x-1">
+                                                            {decryptedData.username && (
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        copyToClipboard(decryptedData.username!, 'Username');
+                                                                    }}
+                                                                    className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+                                                                    title="Copy username"
+                                                                >
+                                                                    <UserIcon className="h-3 w-3" />
+                                                                </button>
+                                                            )}
+                                                            {decryptedData.password && (
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        copyToClipboard(decryptedData.password!, 'Password');
+                                                                    }}
+                                                                    className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+                                                                    title="Copy password"
+                                                                >
+                                                                    <KeyIcon className="h-3 w-3" />
+                                                                </button>
+                                                            )}
+                                                        </div>
                                                         <ChevronRightIcon className="h-3 w-3 text-gray-400" />
                                                     </div>
                                                 </div>
@@ -967,7 +1040,7 @@ export const Dashboard: React.FC = () => {
                                 )}
                             </div>
                         ) : (
-                            <div className="text-center py-12">
+                            <div className="text-center py-12 px-4">
                                 <FolderIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                                 <p className="text-gray-500 dark:text-gray-400">
                                     Select a vault to view your items

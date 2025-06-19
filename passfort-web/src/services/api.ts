@@ -253,8 +253,14 @@ class ApiClient {
     return this.request<VaultItemDto>(`/Vault/${vaultId}/items/${itemId}`);
   }
 
-  async updateVaultItem(itemId: string, request: UpdateVaultItemRequestDto): Promise<UpdateVaultItemResponseDto> {
-    return this.request<UpdateVaultItemResponseDto>(`/Vault/items/${itemId}`, {
+  async updateVaultItem(vaultId: string, itemId: string, request: UpdateVaultItemRequestDto): Promise<UpdateVaultItemResponseDto> {
+    console.log('🔍 API Debug - updateVaultItem called with:', {
+      vaultId,
+      itemId,
+      requestId: request.id,
+      endpoint: `/Vault/${vaultId}/items/${itemId}`
+    });
+    return this.request<UpdateVaultItemResponseDto>(`/Vault/${vaultId}/items/${itemId}`, {
       method: 'PUT',
       body: JSON.stringify(request),
     });
