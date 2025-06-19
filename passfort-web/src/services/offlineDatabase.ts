@@ -126,7 +126,7 @@ export class OfflineDatabase extends Dexie {
             isDeleted: true,
             needsSync: true,
             lastSynced: Date.now()
-        });
+        } as Partial<OfflineVault>);
 
         // Also mark all items in this vault as deleted
         const items = await this.vaultItems.where('vaultId').equals(vaultId).toArray();
@@ -135,7 +135,7 @@ export class OfflineDatabase extends Dexie {
                 isDeleted: true,
                 needsSync: true,
                 lastSynced: Date.now()
-            });
+            } as Partial<OfflineVaultItem>);
         }
 
         console.log(`🗑️ Vault marked for deletion: ${vaultId}`);
@@ -179,7 +179,7 @@ export class OfflineDatabase extends Dexie {
             isDeleted: true,
             needsSync: true,
             lastSynced: Date.now()
-        });
+        } as Partial<OfflineVaultItem>);
 
         console.log(`🗑️ Vault item marked for deletion: ${itemId}`);
     }
@@ -213,7 +213,7 @@ export class OfflineDatabase extends Dexie {
         if (operation) {
             await this.operations.update(operationId, {
                 retryCount: operation.retryCount + 1
-            });
+            } as Partial<OfflineOperation>);
         }
     }
 
@@ -253,11 +253,17 @@ export class OfflineDatabase extends Dexie {
     }
 
     async markSynced(type: 'vault' | 'item', id: string): Promise<void> {
-        const table = type === 'vault' ? this.vaults : this.vaultItems;
-        await table.update(id, {
-            needsSync: false,
-            lastSynced: Date.now()
-        });
+        if (type === 'vault') {
+            await this.vaults.update(id, {
+                needsSync: false,
+                lastSynced: Date.now()
+            });
+        } else {
+            await this.vaultItems.update(id, {
+                needsSync: false,
+                lastSynced: Date.now()
+            });
+        }
         console.log(`✅ Marked as synced: ${type} ${id}`);
     }
 }
