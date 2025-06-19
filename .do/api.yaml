@@ -1,0 +1,50 @@
+# .do/api-only.yaml
+name: passfort-api
+services:
+- name: passfort-api
+  source_dir: /
+  github:
+    repo: your-github-username/passfort-repo
+    branch: main
+  run_command: dotnet PassFort.API.dll
+  environment_slug: dotnet
+  instance_count: 1
+  instance_size_slug: basic-xxs
+  dockerfile_path: PassFort.API/Dockerfile
+  http_port: 5123
+  health_check:
+    http_path: /health
+  envs:
+  - key: ASPNETCORE_ENVIRONMENT
+    value: Production
+  - key: ASPNETCORE_URLS
+    value: http://+:5123
+  - key: JWT__SecretKey
+    value: ${JWT_SECRET_KEY}
+    type: SECRET
+  - key: JWT__Issuer
+    value: PassFort.API
+  - key: JWT__Audience
+    value: PassFort.Client
+  - key: ConnectionStrings__DefaultConnection
+    value: ${DATABASE_URL}
+    type: SECRET
+
+databases:
+- name: passfort-db
+  engine: PG
+  version: "15"
+  size: basic-xs
+  num_nodes: 1
+
+jobs:
+- name: db-migrate
+  source_dir: /
+  github:
+    repo: your-github-username/passfort-repo
+    branch: main
+  run_command: dotnet ef database update --project PassFort.API
+  environment_slug: dotnet
+  instance_count: 1
+  instance_size_slug: basic-xxs
+  kind: PRE_DEPLOY
