@@ -10,6 +10,9 @@ import { Register } from './pages/Register';
 import { Settings } from './pages/Settings';
 import { Dashboard } from './pages/Dashboard'; // Import the new comprehensive dashboard
 
+// Components
+import { PWAInstallBanner } from './components/ui/PWAInstallBanner';
+
 // Store
 import { useAuthStore } from './store/authStore';
 
@@ -96,6 +99,9 @@ const App: React.FC = () => {
             {/* Default redirect */}
             <Route path="/" element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} replace />} />
           </Routes>
+
+          {/* PWA Install Banner */}
+          <PWAInstallBanner />
         </div>
       </Router>
     </ThemeProvider>
