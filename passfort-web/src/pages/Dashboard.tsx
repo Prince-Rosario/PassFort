@@ -33,6 +33,7 @@ import toast from 'react-hot-toast';
 
 import { useAuthStore } from '../store/authStore';
 import { vaultService, type ClientVaultData, type ClientVaultItemData } from '../services/vaultService';
+import { offlineVaultService } from '../services/offlineVaultService';
 import type { VaultSummaryDto, VaultItemDto } from '../types/vault';
 import { VaultItemType } from '../types/vault';
 import { Button } from '../components/ui/Button';
@@ -224,14 +225,14 @@ export const Dashboard: React.FC = () => {
             setIsLoading(true);
             console.log('🔐 Loading vaults with zero-knowledge encryption...');
 
-            const userVaults = await vaultService.getVaults();
+            const userVaults = await offlineVaultService.getVaults();
 
             // Decrypt vault names for display
             const decryptedVaults: DecryptedVaultSummary[] = [];
             for (const vault of userVaults) {
                 try {
                     // Decrypt the vault name for display
-                    const decryptedNameData = await vaultService.decryptData<{ value: string }>(vault.name);
+                    const decryptedNameData = await offlineVaultService.decryptData<{ value: string }>(vault.name);
                     decryptedVaults.push({
                         vault,
                         decryptedName: decryptedNameData.value
@@ -283,7 +284,7 @@ export const Dashboard: React.FC = () => {
                 return;
             }
 
-            const encryptedItems = await vaultService.getVaultItems(vaultId);
+            const encryptedItems = await offlineVaultService.getVaultItems(vaultId);
             console.log(`📋 Retrieved ${encryptedItems.length} encrypted items from server`);
 
             const decryptedItems: DecryptedVaultItem[] = [];
@@ -292,7 +293,7 @@ export const Dashboard: React.FC = () => {
             for (const item of encryptedItems) {
                 try {
                     console.log(`🔓 Attempting to decrypt item ${item.id}...`);
-                    const { decryptedData } = await vaultService.getVaultItem(vaultId, item.id);
+                    const { decryptedData } = await offlineVaultService.getVaultItem(vaultId, item.id);
                     decryptedItems.push({ item, decryptedData });
                     console.log(`✅ Successfully decrypted item ${item.id}`);
                 } catch (error) {
@@ -337,7 +338,7 @@ export const Dashboard: React.FC = () => {
                 name: newVaultName.trim(),
                 description: `Personal vault created on ${new Date().toLocaleDateString()}`
             };
-            await vaultService.createVault(vaultData);
+            await offlineVaultService.createVault(vaultData);
             setNewVaultName('');
             setShowCreateVaultForm(false);
             await loadVaults();
@@ -447,7 +448,7 @@ export const Dashboard: React.FC = () => {
     // Delete vault
     const deleteVault = async (vaultId: string) => {
         try {
-            await vaultService.deleteVault(vaultId);
+            await offlineVaultService.deleteVault(vaultId);
 
             // Reset selection if deleted vault was selected
             if (selectedVault === vaultId) {
@@ -483,7 +484,7 @@ export const Dashboard: React.FC = () => {
             event.stopPropagation();
         }
         try {
-            await vaultService.toggleFavorite(vaultId, itemId);
+            await offlineVaultService.toggleFavorite(vaultId, itemId);
             // Reload items to reflect the change
             await loadVaultItems(vaultId);
             toast.success('Favorite status updated');
@@ -498,7 +499,7 @@ export const Dashboard: React.FC = () => {
         try {
             if (!selectedVault) return;
 
-            await vaultService.deleteVaultItem(selectedVault, itemId);
+            await offlineVaultService.deleteVaultItem(selectedVault, itemId);
 
             // Close modal and reload items
             setShowItemDetailModal(false);
@@ -527,10 +528,10 @@ export const Dashboard: React.FC = () => {
             await loadVaultItems(selectedVault);
             // Update the selected item with fresh data
             if (selectedItem) {
-                const updatedItems = await vaultService.getVaultItems(selectedVault);
+                const updatedItems = await offlineVaultService.getVaultItems(selectedVault);
                 const updatedItem = updatedItems.find(item => item.id === selectedItem.item.id);
                 if (updatedItem) {
-                    const decryptedData = await vaultService.decryptData<ClientVaultItemData>(updatedItem.encryptedData);
+                    const decryptedData = await offlineVaultService.decryptData<ClientVaultItemData>(updatedItem.encryptedData);
                     setSelectedItem({ item: updatedItem, decryptedData });
                 }
             }

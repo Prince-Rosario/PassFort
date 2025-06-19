@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { VaultItemType } from '../../types/vault';
-import { vaultService } from '../../services/vaultService';
+import { offlineVaultService } from '../../services/offlineVaultService';
 import toast from 'react-hot-toast';
 import ItemTypeSelector from './ItemTypeSelector';
 import LoginForm from './forms/LoginForm';
@@ -52,7 +52,7 @@ const AddItemModal: React.FC<AddItemModalProps> = ({
                 customFields: convertToCustomFields(formData, selectedType)
             };
 
-            await vaultService.createVaultItem(vaultId, itemData, selectedType);
+            await offlineVaultService.createVaultItem(vaultId, itemData, selectedType);
 
             toast.success('Item created successfully!');
             onItemCreated?.();

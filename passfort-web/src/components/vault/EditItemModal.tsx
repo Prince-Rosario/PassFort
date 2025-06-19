@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { VaultItemType } from '../../types/vault';
-import { vaultService } from '../../services/vaultService';
+import { offlineVaultService } from '../../services/offlineVaultService';
 import type { ClientVaultItemData } from '../../services/vaultService';
 import type { VaultItemDto } from '../../types/vault';
 import toast from 'react-hot-toast';
@@ -46,7 +46,7 @@ const EditItemModal: React.FC<EditItemModalProps> = ({
                 customFields: convertToCustomFields(formData, item.itemType as VaultItemType)
             };
 
-            await vaultService.updateVaultItem(vaultId, item.id, itemData, item.itemType);
+            await offlineVaultService.updateVaultItem(vaultId, item.id, itemData, item.itemType);
 
             toast.success('Item updated successfully!');
             onItemUpdated?.();
