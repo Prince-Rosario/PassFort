@@ -30,6 +30,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 // Theme Provider Component
 const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { theme } = useTheme(); // This will automatically initialize and apply the theme
+  void theme; // Explicitly mark as used for TypeScript
 
   return <>{children}</>;
 };

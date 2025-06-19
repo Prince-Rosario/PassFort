@@ -8,6 +8,7 @@
     "dev:ngrok": "vite --config vite.config.dev.ts",
     "dev:secure": "vite --config vite.config.https.ts",
     "build": "tsc -b && vite build",
+    "build:deploy": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },
