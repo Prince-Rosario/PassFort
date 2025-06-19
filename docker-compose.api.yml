@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: passfort-database
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-passfort}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - passfort-network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d passfort" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  passfort-api:
+    build:
+      context: .
+      dockerfile: PassFort.API/Dockerfile
+    container_name: passfort-api
+    restart: unless-stopped
+    ports:
+      - "${API_PORT:-5123}:5123"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:5123
+      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=${POSTGRES_DB:-passfort};Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD}
+      - JWT__SecretKey=${JWT_SECRET_KEY}
+      - JWT__Issuer=PassFort.API
+      - JWT__Audience=PassFort.Client
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - passfort-network
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:5123/health || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  postgres_data:
+
+
+networks:
+  passfort-network:
+    driver: bridge
