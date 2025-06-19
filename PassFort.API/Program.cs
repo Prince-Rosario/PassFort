@@ -151,11 +151,21 @@ builder.Services.AddCors(options =>
                 corsBuilder
                     .WithOrigins(
                         "https://passfort-git-init-deployment-prince-rosarios-projects.vercel.app",
+                        "https://pass-fort-one.vercel.app",
                         "https://passfort-web.vercel.app",
-                        "https://*.vercel.app",
                         "https://princerosario.tech",
                         "https://www.princerosario.tech"
                     )
+                    .SetIsOriginAllowed(origin =>
+                    {
+                        // Allow any vercel.app domain in production
+                        if (string.IsNullOrEmpty(origin)) return false;
+                        
+                        var uri = new Uri(origin);
+                        return uri.Host.EndsWith(".vercel.app") ||
+                               uri.Host == "princerosario.tech" ||
+                               uri.Host == "www.princerosario.tech";
+                    })
                     .WithMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                     .WithHeaders("Content-Type", "Authorization", "X-Requested-With")
                     .AllowCredentials()
