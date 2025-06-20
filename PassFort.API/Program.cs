@@ -166,8 +166,8 @@ builder.Services.AddCors(options =>
                                uri.Host == "princerosario.tech" ||
                                uri.Host == "www.princerosario.tech";
                     })
-                    .WithMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
-                    .WithHeaders("Content-Type", "Authorization", "X-Requested-With")
+                    .WithMethods("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH")
+                    .WithHeaders("Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin")
                     .AllowCredentials()
                     .SetPreflightMaxAge(TimeSpan.FromMinutes(10));
             }
@@ -186,11 +186,11 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-// Add security headers middleware - should be early in pipeline
-app.UseSecurityHeaders();
-
-// Global CORS policy
+// Global CORS policy - must be before security headers
 app.UseCors("AllowSpecificOrigins");
+
+// Add security headers middleware - after CORS
+app.UseSecurityHeaders();
 
 // Add token blacklist middleware - must be before Authentication
 app.UseTokenBlacklist();

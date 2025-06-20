@@ -197,6 +197,18 @@ namespace PassFort.API.Controllers
             }
         }
 
+        [HttpGet("test-cors")]
+        public IActionResult TestCors()
+        {
+            return Ok(new { message = "CORS is working!", timestamp = DateTime.UtcNow });
+        }
+
+        [HttpOptions("security-level")]
+        public IActionResult PreflightSecurityLevel()
+        {
+            return NoContent();
+        }
+
         [HttpPost("security-level")]
         public async Task<IActionResult> GetSecurityLevel([FromBody] SecurityLevelRequestDto request)
         {

@@ -28,11 +28,11 @@ namespace PassFort.API.Middleware
                     "max-age=31536000; includeSubDomains; preload";
             }
 
-            // Cross-Origin-Opener-Policy (COOP) - Prevents cross-origin attacks
-            context.Response.Headers["Cross-Origin-Opener-Policy"] = "same-origin";
+            // Cross-Origin-Opener-Policy (COOP) - More permissive for API access
+            context.Response.Headers["Cross-Origin-Opener-Policy"] = "unsafe-none";
 
-            // Cross-Origin-Embedder-Policy (COEP) - Additional isolation
-            context.Response.Headers["Cross-Origin-Embedder-Policy"] = "require-corp";
+            // Cross-Origin-Embedder-Policy (COEP) - More permissive for API access  
+            context.Response.Headers["Cross-Origin-Embedder-Policy"] = "unsafe-none";
 
             // X-Frame-Options - Prevents clickjacking
             context.Response.Headers["X-Frame-Options"] = "DENY";
@@ -73,11 +73,11 @@ namespace PassFort.API.Middleware
             }
             else
             {
-                // Production CSP - Strict security for password manager
+                // Production CSP - Allow external connections for API
                 csp.Add("default-src 'self'");
                 csp.Add("script-src 'self'");
                 csp.Add("style-src 'self' 'unsafe-inline'"); // Allow inline styles for UI frameworks
-                csp.Add("connect-src 'self'");
+                csp.Add("connect-src 'self' https://princerosario.tech https://*.vercel.app https://*.netlify.app");
                 csp.Add("img-src 'self' data:");
                 csp.Add("font-src 'self' data:");
                 csp.Add("object-src 'none'");
