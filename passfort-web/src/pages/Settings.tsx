@@ -17,9 +17,10 @@ import { MFASettings } from '../components/ui/MFASettings';
 import { AccountSettings } from '../components/ui/AccountSettings';
 import { PreferencesSettings } from '../components/ui/PreferencesSettings';
 import { DangerZoneSettings } from '../components/ui/DangerZoneSettings';
+import { BackupRestoreSettings } from '../components/ui/BackupRestoreSettings';
 
 // Settings section type
-type SettingsSection = 'account' | 'security' | 'mfa' | 'preferences' | 'danger';
+type SettingsSection = 'account' | 'security' | 'mfa' | 'backup' | 'preferences' | 'danger';
 
 export const Settings: React.FC = () => {
     const { user } = useAuthStore();
@@ -45,6 +46,16 @@ export const Settings: React.FC = () => {
             name: 'Two-Factor Auth',
             icon: DevicePhoneMobileIcon,
             description: 'Multi-factor authentication'
+        },
+        {
+            id: 'backup' as SettingsSection,
+            name: 'Backup & Restore',
+            icon: ({ className }: { className?: string }) => (
+                <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+                </svg>
+            ),
+            description: 'Export and import vault data'
         },
         {
             id: 'preferences' as SettingsSection,
@@ -79,6 +90,8 @@ export const Settings: React.FC = () => {
                 );
             case 'mfa':
                 return <MFASettings />;
+            case 'backup':
+                return <BackupRestoreSettings />;
             case 'preferences':
                 return <PreferencesSettings />;
             case 'danger':
