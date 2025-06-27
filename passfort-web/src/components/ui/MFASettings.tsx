@@ -444,10 +444,10 @@ export const MFASettings: React.FC = () => {
                     🔐 Recommended Authenticator Apps
                 </h4>
                 <div className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
-                    <p>• <strong>Google Authenticator</strong> - Simple and reliable</p>
+                    <p>• <strong>Ente Auth</strong> - Open-source with end-to-end encryption</p>
                     <p>• <strong>Authy</strong> - Multi-device sync with backup</p>
+                    <p>• <strong>Google Authenticator</strong> - Simple and reliable</p>
                     <p>• <strong>Microsoft Authenticator</strong> - Enterprise-grade security</p>
-                    <p>• <strong>1Password</strong> - Integrated with password manager</p>
                 </div>
             </div>
         </div>

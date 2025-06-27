@@ -51,9 +51,7 @@ const registerSchema = z.object({
   confirmMasterPassword: z
     .string()
     .min(1, 'Please confirm your master password'),
-  agreeToTerms: z
-    .boolean()
-    .refine(val => val === true, 'You must agree to the Terms of Service'),
+
 }).refine((data) => data.masterPassword === data.confirmMasterPassword, {
   message: "Master passwords don't match",
   path: ["confirmMasterPassword"],
@@ -263,29 +261,7 @@ export const Register: React.FC = () => {
 
 
 
-            <div className="flex items-start">
-              <input
-                {...register('agreeToTerms')}
-                id="agree-terms"
-                type="checkbox"
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded mt-1"
-              />
-              <label htmlFor="agree-terms" className="ml-2 block text-sm text-gray-900 dark:text-gray-300">
-                I agree to the{' '}
-                <Link to="/terms" className="text-blue-600 hover:text-blue-500 dark:text-blue-400">
-                  Terms of Service
-                </Link>{' '}
-                and{' '}
-                <Link to="/privacy" className="text-blue-600 hover:text-blue-500 dark:text-blue-400">
-                  Privacy Policy
-                </Link>
-              </label>
-            </div>
-            {errors.agreeToTerms && (
-              <p className="text-sm text-red-600 dark:text-red-400 mt-1">
-                {errors.agreeToTerms.message}
-              </p>
-            )}
+
 
             {error && (
               <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
