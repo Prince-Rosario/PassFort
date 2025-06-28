@@ -6,4 +6,8 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\PassFort.DAL\PassFort.DAL.csproj" />
+  </ItemGroup>
+
 </Project>

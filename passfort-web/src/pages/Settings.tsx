@@ -8,7 +8,8 @@ import {
     ShieldCheckIcon,
     EyeIcon,
     ExclamationTriangleIcon,
-    DevicePhoneMobileIcon
+    DevicePhoneMobileIcon,
+    EnvelopeIcon
 } from '@heroicons/react/24/outline';
 
 import { useAuthStore } from '../store/authStore';
@@ -19,9 +20,10 @@ import { PreferencesSettings } from '../components/ui/PreferencesSettings';
 import { DangerZoneSettings } from '../components/ui/DangerZoneSettings';
 import { BackupRestoreSettings } from '../components/ui/BackupRestoreSettings';
 import ImportSettings from '../components/ui/ImportSettings';
+import { InviteManager } from '../components/ui/InviteManager';
 
 // Settings section type
-type SettingsSection = 'account' | 'security' | 'mfa' | 'backup' | 'import' | 'preferences' | 'danger';
+type SettingsSection = 'account' | 'security' | 'mfa' | 'backup' | 'import' | 'invites' | 'preferences' | 'danger';
 
 export const Settings: React.FC = () => {
     const { user } = useAuthStore();
@@ -69,6 +71,12 @@ export const Settings: React.FC = () => {
             description: 'Import from other password managers'
         },
         {
+            id: 'invites' as SettingsSection,
+            name: 'Team Invites',
+            icon: EnvelopeIcon,
+            description: 'Manage team invitations'
+        },
+        {
             id: 'preferences' as SettingsSection,
             name: 'Preferences',
             icon: EyeIcon,
@@ -105,6 +113,12 @@ export const Settings: React.FC = () => {
                 return <BackupRestoreSettings />;
             case 'import':
                 return <ImportSettings />;
+            case 'invites':
+                return (
+                    <div className="p-6">
+                        <InviteManager />
+                    </div>
+                );
             case 'preferences':
                 return <PreferencesSettings />;
             case 'danger':

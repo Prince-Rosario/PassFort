@@ -9,6 +9,8 @@ import { Login } from './pages/Login';
 import { Register } from './pages/Register';
 import { Settings } from './pages/Settings';
 import { Dashboard } from './pages/Dashboard'; // Import the new comprehensive dashboard
+import { Teams } from './pages/Teams';
+import { TeamDetail } from './pages/TeamDetail';
 
 // Components
 import { PWAInstallBanner } from './components/ui/PWAInstallBanner';
@@ -88,6 +90,16 @@ const App: React.FC = () => {
             <Route path="/dashboard" element={
               <ProtectedRoute>
                 <Dashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/teams" element={
+              <ProtectedRoute>
+                <Teams />
+              </ProtectedRoute>
+            } />
+            <Route path="/teams/:teamId" element={
+              <ProtectedRoute>
+                <TeamDetail />
               </ProtectedRoute>
             } />
             <Route path="/settings" element={

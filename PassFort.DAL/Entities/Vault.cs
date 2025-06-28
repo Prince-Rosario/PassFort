@@ -32,5 +32,6 @@ namespace PassFort.DAL.Entities
         public virtual ICollection<VaultItem> VaultItems { get; set; } = new List<VaultItem>();
         public virtual ICollection<VaultFolder> VaultFolders { get; set; } =
             new List<VaultFolder>();
+        public virtual ICollection<VaultShare> VaultShares { get; set; } = new List<VaultShare>();
     }
 }

@@ -15,6 +15,11 @@ namespace PassFort.DAL.Data
         public DbSet<Vault> Vaults { get; set; }
         public DbSet<VaultItem> VaultItems { get; set; }
         public DbSet<VaultFolder> VaultFolders { get; set; }
+        
+        // Team-related entities
+        public DbSet<Team> Teams { get; set; }
+        public DbSet<TeamMember> TeamMembers { get; set; }
+        public DbSet<VaultShare> VaultShares { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -135,6 +140,81 @@ namespace PassFort.DAL.Data
                     .HasOne(e => e.ParentFolder)
                     .WithMany(f => f.SubFolders)
                     .HasForeignKey(e => e.ParentFolderId)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            // Configure Team
+            builder.Entity<Team>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Name).IsRequired().HasMaxLength(200);
+                entity.Property(e => e.Description).HasMaxLength(1000);
+                entity.Property(e => e.AdminUserId).IsRequired();
+                entity.HasIndex(e => e.AdminUserId);
+
+                entity
+                    .HasOne(e => e.AdminUser)
+                    .WithMany(u => u.AdminTeams)
+                    .HasForeignKey(e => e.AdminUserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // Configure TeamMember
+            builder.Entity<TeamMember>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.TeamId).IsRequired();
+                entity.Property(e => e.UserId).IsRequired();
+                entity.Property(e => e.Role).IsRequired();
+                entity.HasIndex(e => new { e.TeamId, e.UserId }).IsUnique();
+                entity.HasIndex(e => e.InviteToken);
+
+                entity
+                    .HasOne(e => e.Team)
+                    .WithMany(t => t.TeamMembers)
+                    .HasForeignKey(e => e.TeamId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity
+                    .HasOne(e => e.User)
+                    .WithMany(u => u.TeamMemberships)
+                    .HasForeignKey(e => e.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity
+                    .HasOne(e => e.InvitedByUser)
+                    .WithMany()
+                    .HasForeignKey(e => e.InvitedByUserId)
+                    .OnDelete(DeleteBehavior.SetNull);
+            });
+
+            // Configure VaultShare
+            builder.Entity<VaultShare>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.VaultId).IsRequired();
+                entity.Property(e => e.TeamId).IsRequired();
+                entity.Property(e => e.Permission).IsRequired();
+                entity.Property(e => e.SharedByUserId).IsRequired();
+                entity.Property(e => e.EncryptedVaultKey).IsRequired();
+                entity.HasIndex(e => new { e.VaultId, e.TeamId }).IsUnique();
+
+                entity
+                    .HasOne(e => e.Vault)
+                    .WithMany(v => v.VaultShares)
+                    .HasForeignKey(e => e.VaultId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity
+                    .HasOne(e => e.Team)
+                    .WithMany(t => t.SharedVaults)
+                    .HasForeignKey(e => e.TeamId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity
+                    .HasOne(e => e.SharedByUser)
+                    .WithMany(u => u.SharedVaults)
+                    .HasForeignKey(e => e.SharedByUserId)
                     .OnDelete(DeleteBehavior.Restrict);
             });
         }

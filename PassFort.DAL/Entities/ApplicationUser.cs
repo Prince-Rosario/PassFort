@@ -33,5 +33,10 @@ namespace PassFort.DAL.Entities
         public virtual ICollection<UserRecoveryCode> RecoveryCodes { get; set; } =
             new List<UserRecoveryCode>();
         public virtual ICollection<Vault> Vaults { get; set; } = new List<Vault>();
+        
+        // Team-related navigation properties
+        public virtual ICollection<Team> AdminTeams { get; set; } = new List<Team>();
+        public virtual ICollection<TeamMember> TeamMemberships { get; set; } = new List<TeamMember>();
+        public virtual ICollection<VaultShare> SharedVaults { get; set; } = new List<VaultShare>();
     }
 }

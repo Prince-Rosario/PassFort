@@ -93,11 +93,17 @@ builder.Services.AddScoped<IVaultRepository, VaultRepository>();
 builder.Services.AddScoped<IVaultItemRepository, VaultItemRepository>();
 builder.Services.AddScoped<IVaultFolderRepository, VaultFolderRepository>();
 
+// Team-related repositories
+builder.Services.AddScoped<ITeamRepository, TeamRepository>();
+builder.Services.AddScoped<ITeamMemberRepository, TeamMemberRepository>();
+builder.Services.AddScoped<IVaultShareRepository, VaultShareRepository>();
+
 // Register Business Logic Layer (BLL)
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IMfaService, MfaService>();
 builder.Services.AddScoped<IVaultService, VaultService>();
+builder.Services.AddScoped<ITeamService, TeamService>();
 
 // CORS Configuration - Secure for password manager
 builder.Services.AddCors(options =>
