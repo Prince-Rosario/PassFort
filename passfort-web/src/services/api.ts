@@ -305,4 +305,4 @@ class ApiClient {
 
 // Export singleton instance
 export const apiClient = new ApiClient(API_BASE_URL);
-export { ApiError }; 
+export { ApiError }; // API URL updated
