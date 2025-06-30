@@ -454,7 +454,8 @@ namespace PassFort.BLL.Services
                 SharedByUserId = vaultShare.SharedByUserId,
                 SharedByUserEmail = vaultShare.SharedByUser?.Email ?? "",
                 SharedAt = vaultShare.SharedAt,
-                LastAccessedAt = vaultShare.LastAccessedAt
+                LastAccessedAt = vaultShare.LastAccessedAt,
+                EncryptedVaultKey = vaultShare.EncryptedVaultKey
             };
         }
 

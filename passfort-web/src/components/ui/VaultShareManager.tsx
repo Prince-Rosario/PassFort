@@ -13,6 +13,7 @@ import {
 import { Button } from './Button';
 import { TeamService } from '../../services/teamService';
 import { vaultService } from '../../services/vaultService';
+import { SecureKeyManager, encryptVaultKey, deriveTeamKey } from '../../utils/crypto';
 import type {
     VaultShare,
     Team,
@@ -68,11 +69,11 @@ export const VaultShareManager: React.FC<VaultShareManagerProps> = ({
             const decryptedVaults: Array<{ vault: VaultSummaryDto; decryptedName: string }> = [];
             for (const vault of vaultsData) {
                 try {
-                    // Decrypt the vault name for display
-                    const decryptedNameData = await vaultService.decryptData<{ value: string }>(vault.name);
+                    // Decrypt the vault name using vault-specific key
+                    const decryptedName = await vaultService.decryptVaultName(vault.id, vault.name);
                     decryptedVaults.push({
                         vault,
-                        decryptedName: decryptedNameData.value
+                        decryptedName: decryptedName
                     });
                 } catch (error) {
                     console.warn(`Failed to decrypt vault name for vault ${vault.id}:`, error);
@@ -108,11 +109,31 @@ export const VaultShareManager: React.FC<VaultShareManagerProps> = ({
         try {
             if (!selectedTeam || !selectedVault) return;
 
+            console.log(`🔐 Starting team-based vault key sharing for vault ${selectedVault} with team ${selectedTeam}`);
+
+            const vaultData = vaults.find(v => v.vault.id === selectedVault);
+            if (!vaultData) {
+                setError('Vault not found');
+                return;
+            }
+
+            // Get the vault's encryption key 
+            const vaultKey = await vaultService.getVaultKey(selectedVault);
+            if (!vaultKey) {
+                setError('Could not access vault encryption key');
+                return;
+            }
+
+            // Create a team-based encrypted vault key that any team member can decrypt
+            const teamBasedKey = await deriveTeamKey(selectedTeam);
+            const encryptedVaultKeyForSharing = await encryptVaultKey(vaultKey, teamBasedKey);
+            console.log('🔑 Encrypted vault key for team-based sharing');
+
             const shareData: ShareVaultRequest = {
                 vaultId: selectedVault,
                 teamId: selectedTeam,
                 permission: sharePermission,
-                encryptedVaultKey: '' // This would be encrypted with team keys in production
+                encryptedVaultKey: encryptedVaultKeyForSharing
             };
 
             await TeamService.shareVault(shareData);
@@ -122,6 +143,8 @@ export const VaultShareManager: React.FC<VaultShareManagerProps> = ({
             setShowShareModal(false);
             await loadData();
             onSharesUpdated?.();
+
+            console.log('✅ Vault successfully shared with proper key encryption');
         } catch (err) {
             console.error('Error sharing vault:', err);
             setError('Failed to share vault');

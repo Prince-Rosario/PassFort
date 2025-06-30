@@ -230,11 +230,11 @@ export const Dashboard: React.FC = () => {
             const decryptedVaults: DecryptedVaultSummary[] = [];
             for (const vault of userVaults) {
                 try {
-                    // Decrypt the vault name for display
-                    const decryptedNameData = await vaultService.decryptData<{ value: string }>(vault.name);
+                    // Decrypt the vault name using vault-specific key
+                    const decryptedName = await vaultService.decryptVaultName(vault.id, vault.name);
                     decryptedVaults.push({
                         vault,
-                        decryptedName: decryptedNameData.value
+                        decryptedName: decryptedName
                     });
                 } catch (error) {
                     console.warn(`Failed to decrypt vault name for vault ${vault.id}:`, error);
@@ -543,6 +543,20 @@ export const Dashboard: React.FC = () => {
         setShowItemDetailModal(true);
     };
 
+    // Check if user can write to the selected vault
+    const canWriteToVault = (vaultId: string | null): boolean => {
+        if (!vaultId) return false;
+
+        const vault = vaults.find(v => v.vault.id === vaultId);
+        if (!vault) return false;
+
+        // If not a shared vault, user owns it and can write
+        if (!vault.vault.isShared) return true;
+
+        // For shared vaults, check permission level
+        return vault.vault.sharedPermission === 'Write' || vault.vault.sharedPermission === 'Admin';
+    };
+
     if (isLoading) {
         return (
             <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
@@ -765,6 +779,15 @@ export const Dashboard: React.FC = () => {
                                             <div className="flex items-center space-x-2">
                                                 <FolderIcon className="h-4 w-4" />
                                                 <span className="truncate">{vaultData.decryptedName}</span>
+                                                {vaultData.vault.isShared && (
+                                                    <div className="flex items-center space-x-1">
+                                                        <UserIcon className="h-3 w-3 text-blue-500" title="Shared vault" />
+                                                        <span className="text-xs text-blue-500 font-medium" title={`Permission: ${vaultData.vault.sharedPermission}`}>
+                                                            {vaultData.vault.sharedPermission === 'Read' ? 'R' :
+                                                                vaultData.vault.sharedPermission === 'Write' ? 'W' : 'A'}
+                                                        </span>
+                                                    </div>
+                                                )}
                                                 <span className="text-xs text-gray-500 dark:text-gray-400">
                                                     {vaultData.vault.itemCount}
                                                 </span>
@@ -783,17 +806,25 @@ export const Dashboard: React.FC = () => {
                                             </button>
 
                                             {showVaultMenu === vaultData.vault.id && (
-                                                <div className="absolute right-0 top-full mt-1 w-32 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-md shadow-lg z-10">
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setShowDeleteConfirm(vaultData.vault.id);
-                                                            setShowVaultMenu(null);
-                                                        }}
-                                                        className="w-full text-left px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md"
-                                                    >
-                                                        Delete Vault
-                                                    </button>
+                                                <div className="absolute right-0 top-full mt-1 w-40 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-md shadow-lg z-10">
+                                                    {vaultData.vault.isShared && (
+                                                        <div className="px-3 py-2 text-xs text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-600">
+                                                            Shared by: {vaultData.vault.sharedByUserEmail}
+                                                        </div>
+                                                    )}
+                                                    {/* Only show delete for owned vaults or shared vaults with admin permission */}
+                                                    {(!vaultData.vault.isShared || vaultData.vault.sharedPermission === 'Admin') && (
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setShowDeleteConfirm(vaultData.vault.id);
+                                                                setShowVaultMenu(null);
+                                                            }}
+                                                            className="w-full text-left px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md"
+                                                        >
+                                                            {vaultData.vault.isShared ? 'Leave Vault' : 'Delete Vault'}
+                                                        </button>
+                                                    )}
                                                 </div>
                                             )}
                                         </div>
@@ -913,8 +944,9 @@ export const Dashboard: React.FC = () => {
                                     size="sm"
                                     onClick={() => setShowAddItemModal(true)}
                                     leftIcon={<PlusIcon className="h-4 w-4" />}
-                                    disabled={!selectedVault}
+                                    disabled={!selectedVault || !canWriteToVault(selectedVault)}
                                     className="hidden sm:flex"
+                                    title={!canWriteToVault(selectedVault) ? "Read-only vault" : "Add new item"}
                                 >
                                     New Item
                                 </Button>
@@ -923,8 +955,9 @@ export const Dashboard: React.FC = () => {
                                     variant="primary"
                                     size="sm"
                                     onClick={() => setShowAddItemModal(true)}
-                                    disabled={!selectedVault}
+                                    disabled={!selectedVault || !canWriteToVault(selectedVault)}
                                     className="sm:hidden p-2"
+                                    title={!canWriteToVault(selectedVault) ? "Read-only vault" : "Add new item"}
                                 >
                                     <PlusIcon className="h-4 w-4" />
                                 </Button>
@@ -942,7 +975,7 @@ export const Dashboard: React.FC = () => {
                                         <p className="text-gray-500 dark:text-gray-400">
                                             {searchTerm ? 'No items match your search' : 'No items in this category'}
                                         </p>
-                                        {!searchTerm && selectedCategory === 'all' && (
+                                        {!searchTerm && selectedCategory === 'all' && canWriteToVault(selectedVault) && (
                                             <Button
                                                 variant="primary"
                                                 className="mt-4"
@@ -951,6 +984,11 @@ export const Dashboard: React.FC = () => {
                                             >
                                                 Add Your First Item
                                             </Button>
+                                        )}
+                                        {!searchTerm && selectedCategory === 'all' && !canWriteToVault(selectedVault) && (
+                                            <p className="text-gray-400 dark:text-gray-500 text-sm mt-2">
+                                                This is a read-only shared vault
+                                            </p>
                                         )}
                                     </div>
                                 ) : (

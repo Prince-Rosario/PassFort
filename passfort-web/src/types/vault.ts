@@ -120,11 +120,19 @@ export interface VaultSummaryDto {
     itemCount: number;
     createdAt: string;
     updatedAt: string;
+
+    // Shared vault properties
+    isShared?: boolean; // True if this vault is shared with the user (not owned)
+    sharedPermission?: string; // Permission level if shared (Read, Write, Admin)
+    sharedByUserEmail?: string; // Email of user who shared the vault
+    sharedAt?: string; // When the vault was shared
+    encryptedVaultKey?: string; // Encrypted vault key for shared vaults
 }
 
 // Full vault details
 export interface VaultDto extends VaultSummaryDto {
     encryptedData: string;
+    encryptedVaultKey: string;
 }
 
 // Request DTOs for API
@@ -132,6 +140,7 @@ export interface CreateVaultRequestDto {
     name: string; // Will be encrypted client-side
     description?: string; // Will be encrypted client-side
     encryptedData: string; // Encrypted vault metadata
+    encryptedVaultKey: string; // Encrypted vault key for sharing
 }
 
 export interface UpdateVaultRequestDto {

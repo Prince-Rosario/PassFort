@@ -1,7 +1,14 @@
 // Zero-Knowledge Vault Service for PassFort Password Manager
 
 import { apiClient } from './api';
-import { SecureKeyManager } from '../utils/crypto';
+import {
+    SecureKeyManager,
+    generateVaultKey,
+    encryptVaultKey,
+    decryptVaultKey,
+    encryptWithKey,
+    decryptWithKey
+} from '../utils/crypto';
 import type {
     CreateVaultRequestDto,
     VaultDto,
@@ -113,25 +120,186 @@ class VaultService {
         }
     }
 
+    async getVaultKey(vaultId: string): Promise<CryptoKey | null> {
+        // Check if vault key is already cached
+        const cachedKey = this.keyManager.getVaultKey(vaultId);
+        if (cachedKey) {
+            console.log(`🔑 Using cached vault key for vault ${vaultId}`);
+            return cachedKey;
+        }
+
+        // Get user's personal key
+        const userKey = this.keyManager.getEncryptionKey();
+        if (!userKey) {
+            console.log('❌ No user encryption key available');
+            return null;
+        }
+
+        try {
+            // Get vault info to access the encrypted vault key
+            const vaults = await this.getVaults();
+            const vaultInfo = vaults.find(v => v.id === vaultId);
+
+            if (!vaultInfo) {
+                console.log(`❌ Vault ${vaultId} not found in user's vaults`);
+                return null;
+            }
+
+            let encryptedVaultKey: string;
+
+            if (vaultInfo.isShared && vaultInfo.encryptedVaultKey) {
+                // For shared vaults, use the shared encrypted key
+                encryptedVaultKey = vaultInfo.encryptedVaultKey;
+                console.log(`🔐 Using shared vault key for vault ${vaultId}`);
+            } else {
+                // For owned vaults, get the vault details which include the encrypted vault key
+                const vaultDetails = await apiClient.getVault(vaultId);
+                encryptedVaultKey = vaultDetails.encryptedVaultKey;
+                console.log(`🔐 Using owned vault key for vault ${vaultId}`);
+            }
+
+            // Check if this is a legacy vault (no encrypted vault key)
+            if (!encryptedVaultKey || encryptedVaultKey.trim() === '') {
+                console.log(`🔄 Legacy vault detected (${vaultId}) - using user's personal key directly`);
+                // For legacy vaults, use the user's personal key directly
+                this.keyManager.setVaultKey(vaultId, userKey);
+                return userKey;
+            }
+
+            let vaultKey: CryptoKey;
+
+            if (vaultInfo.isShared) {
+                // For shared vaults, decrypt with team-based key
+                const { deriveTeamKey } = await import('../utils/crypto');
+                // Find the team ID for this shared vault
+                const teamId = this.getTeamIdForSharedVault(vaultId, vaults);
+                if (!teamId) {
+                    throw new Error(`Could not determine team ID for shared vault ${vaultId}`);
+                }
+                const teamKey = await deriveTeamKey(teamId);
+                vaultKey = await decryptVaultKey(encryptedVaultKey, teamKey);
+                console.log(`🔓 Decrypted shared vault key using team-based key`);
+            } else {
+                // For owned vaults, decrypt with user's personal key
+                vaultKey = await decryptVaultKey(encryptedVaultKey, userKey);
+                console.log(`🔓 Decrypted owned vault key using personal key`);
+            }
+
+            // Cache the decrypted vault key
+            this.keyManager.setVaultKey(vaultId, vaultKey);
+
+            console.log(`✅ Successfully decrypted and cached vault key for vault ${vaultId}`);
+            return vaultKey;
+
+        } catch (error) {
+            console.error(`❌ Failed to get vault key for vault ${vaultId}:`, error);
+            console.log(`🔄 Falling back to user's personal key for vault ${vaultId}`);
+            // Fallback: use user's personal key (for legacy vaults)
+            this.keyManager.setVaultKey(vaultId, userKey);
+            return userKey;
+        }
+    }
+
+    private getTeamIdForSharedVault(vaultId: string, vaults: VaultSummaryDto[]): string | null {
+        // Find the vault and check if we can extract team info from the API
+        // For now, we'll need to get team shares to find the team ID
+        // This is a limitation of the current API structure
+
+        // TODO: In a production system, the VaultSummaryDto should include teamId for shared vaults
+        // For now, we'll try to get it from localStorage or make an API call
+
+        // Temporary solution: check if we have team context in localStorage
+        const currentTeamId = localStorage.getItem('current_team_id');
+        if (currentTeamId) {
+            console.log(`🔄 Using current team ID ${currentTeamId} for shared vault ${vaultId}`);
+            return currentTeamId;
+        }
+
+        console.warn(`⚠️ Could not determine team ID for shared vault ${vaultId}`);
+        return null;
+    }
+
+    private async trySharedVaultDecryption(vaultId: string, encryptedData: string): Promise<ClientVaultItemData | null> {
+        try {
+            console.log(`🔄 Attempting proper shared vault decryption for vault ${vaultId}...`);
+
+            // Get the vault-specific key
+            const vaultKey = await this.getVaultKey(vaultId);
+            if (!vaultKey) {
+                console.log(`❌ Could not obtain vault key for vault ${vaultId}`);
+                return null;
+            }
+
+            // Decrypt the data with the vault key
+            const decryptedData = await decryptWithKey<ClientVaultItemData>(encryptedData, vaultKey);
+
+            console.log(`✅ Successfully decrypted shared vault item for vault ${vaultId}`);
+            return decryptedData;
+
+        } catch (error) {
+            console.log(`❌ Shared vault decryption failed for vault ${vaultId}:`, error);
+            return null;
+        }
+    }
+
     // VAULT OPERATIONS
 
-    async createVault(vaultData: ClientVaultData): Promise<VaultDto> {
-        console.log('🔐 Creating vault with zero-knowledge encryption...');
+    // Decrypt vault name using vault-specific key
+    async decryptVaultName(vaultId: string, encryptedName: string): Promise<string> {
+        try {
+            // Get the vault key (handles both new vault-specific keys and legacy user keys)
+            const vaultKey = await this.getVaultKey(vaultId);
+            if (!vaultKey) {
+                console.warn(`Could not obtain vault key for vault ${vaultId}`);
+                return 'Encrypted Vault';
+            }
 
-        const encryptedData = await this.encryptData(vaultData);
-        const encryptedName = await this.encryptData({ value: vaultData.name });
+            // Try decrypting with the vault key (could be vault-specific or user's personal key for legacy vaults)
+            const decryptedNameData = await decryptWithKey<{ value: string }>(encryptedName, vaultKey);
+            return decryptedNameData.value;
+
+        } catch (error) {
+            console.warn(`Failed to decrypt vault name for vault ${vaultId}:`, error);
+            return 'Encrypted Vault';
+        }
+    }
+
+    async createVault(vaultData: ClientVaultData): Promise<VaultDto> {
+        console.log('🔐 Creating vault with proper vault key generation...');
+
+        const userKey = this.keyManager.getEncryptionKey();
+        if (!userKey) {
+            throw new Error('User encryption key not available. Please log in again.');
+        }
+
+        // Generate a unique encryption key for this vault
+        const vaultKey = await generateVaultKey();
+        console.log('🔑 Generated unique vault encryption key');
+
+        // Encrypt vault data with the vault key
+        const encryptedData = await encryptWithKey(vaultData, vaultKey);
+        const encryptedName = await encryptWithKey({ value: vaultData.name }, vaultKey);
         const encryptedDescription = vaultData.description
-            ? await this.encryptData({ value: vaultData.description })
+            ? await encryptWithKey({ value: vaultData.description }, vaultKey)
             : undefined;
+
+        // Encrypt the vault key with the user's personal key for storage
+        const encryptedVaultKey = await encryptVaultKey(vaultKey, userKey);
+        console.log('🔐 Encrypted vault key with user key for storage');
 
         const request: CreateVaultRequestDto = {
             name: encryptedName, // Server receives encrypted name
             description: encryptedDescription, // Server receives encrypted description
-            encryptedData: encryptedData // Server receives encrypted metadata
+            encryptedData: encryptedData, // Server receives encrypted metadata
+            encryptedVaultKey: encryptedVaultKey // Server receives encrypted vault key
         };
 
         const response = await apiClient.createVault(request);
-        console.log('✅ Vault created with zero-knowledge encryption');
+
+        // Cache the vault key for immediate use
+        this.keyManager.setVaultKey(response.vault.id, vaultKey);
+
+        console.log('✅ Vault created with proper key management');
         return response.vault;
     }
 
@@ -147,20 +315,32 @@ class VaultService {
 
         const vault = await apiClient.getVault(vaultId);
 
-        // Decrypt vault data
-        const decryptedData = await this.decryptData<ClientVaultData>(vault.encryptedData);
+        // Get vault-specific key
+        const vaultKey = await this.getVaultKey(vaultId);
+        if (!vaultKey) {
+            throw new Error(`Could not obtain encryption key for vault ${vaultId}`);
+        }
 
-        console.log('✅ Vault fetched and decrypted');
+        // Decrypt vault data with vault-specific key
+        const decryptedData = await decryptWithKey<ClientVaultData>(vault.encryptedData, vaultKey);
+
+        console.log('✅ Vault fetched and decrypted with vault-specific key');
         return { vault, decryptedData };
     }
 
     async updateVault(vaultId: string, vaultData: ClientVaultData): Promise<VaultDto> {
-        console.log('🔐 Updating vault with zero-knowledge encryption...');
+        console.log('🔐 Updating vault with vault-specific encryption...');
 
-        const encryptedData = await this.encryptData(vaultData);
-        const encryptedName = await this.encryptData({ value: vaultData.name });
+        // Get vault-specific key
+        const vaultKey = await this.getVaultKey(vaultId);
+        if (!vaultKey) {
+            throw new Error(`Could not obtain encryption key for vault ${vaultId}`);
+        }
+
+        const encryptedData = await encryptWithKey(vaultData, vaultKey);
+        const encryptedName = await encryptWithKey({ value: vaultData.name }, vaultKey);
         const encryptedDescription = vaultData.description
-            ? await this.encryptData({ value: vaultData.description })
+            ? await encryptWithKey({ value: vaultData.description }, vaultKey)
             : undefined;
 
         const request: UpdateVaultRequestDto = {
@@ -170,17 +350,23 @@ class VaultService {
         };
 
         const response = await apiClient.updateVault(vaultId, request);
-        console.log('✅ Vault updated with zero-knowledge encryption');
+        console.log('✅ Vault updated with vault-specific encryption');
         return response;
     }
 
     // VAULT ITEM OPERATIONS
 
     async createVaultItem(vaultId: string, itemData: ClientVaultItemData, itemType: string = 'Password'): Promise<VaultItemDto> {
-        console.log('🔐 Creating vault item with zero-knowledge encryption...');
+        console.log('🔐 Creating vault item with vault-specific encryption...');
 
-        const encryptedData = await this.encryptData(itemData);
-        const encryptedTitle = await this.encryptData({ value: itemData.title });
+        // Get vault-specific key
+        const vaultKey = await this.getVaultKey(vaultId);
+        if (!vaultKey) {
+            throw new Error(`Could not obtain encryption key for vault ${vaultId}`);
+        }
+
+        const encryptedData = await encryptWithKey(itemData, vaultKey);
+        const encryptedTitle = await encryptWithKey({ value: itemData.title }, vaultKey);
 
         const request: CreateVaultItemRequestDto = {
             vaultId: vaultId,
@@ -190,7 +376,7 @@ class VaultService {
         };
 
         const response = await apiClient.createVaultItem(vaultId, request);
-        console.log('✅ Vault item created with zero-knowledge encryption');
+        console.log('✅ Vault item created with vault-specific encryption');
         return response.vaultItem;
     }
 
@@ -202,24 +388,50 @@ class VaultService {
     }
 
     async getVaultItem(vaultId: string, itemId: string): Promise<{ item: VaultItemDto; decryptedData: ClientVaultItemData }> {
-        console.log(`🔐 Fetching vault item ${itemId} with decryption...`);
+        console.log(`🔐 Fetching vault item ${itemId} with proper vault key decryption...`);
 
         const item = await apiClient.getVaultItem(vaultId, itemId);
 
-        // Decrypt item data
-        const decryptedData = await this.decryptData<ClientVaultItemData>(item.encryptedData);
+        // Get the vault-specific key (which handles both legacy and new vaults)
+        const vaultKey = await this.getVaultKey(vaultId);
+        if (!vaultKey) {
+            throw new Error(`Could not obtain encryption key for vault ${vaultId}`);
+        }
 
-        console.log('✅ Vault item fetched and decrypted');
-        return { item, decryptedData };
+        try {
+            // Try decrypting with the vault key
+            const decryptedData = await decryptWithKey<ClientVaultItemData>(item.encryptedData, vaultKey);
+            console.log('✅ Vault item fetched and decrypted with vault-specific key');
+            return { item, decryptedData };
+        } catch (error) {
+            console.error(`❌ Failed to decrypt vault item ${itemId} from vault ${vaultId}:`, error);
+
+            // Fallback: try with the old decryptData method (for very old items)
+            try {
+                console.log(`🔄 Trying fallback decryption with legacy method for item ${itemId}...`);
+                const fallbackDecryptedData = await this.decryptData<ClientVaultItemData>(item.encryptedData);
+                console.log('✅ Vault item decrypted with fallback legacy method');
+                return { item, decryptedData: fallbackDecryptedData };
+            } catch (fallbackError) {
+                console.error(`❌ Fallback decryption also failed for item ${itemId}:`, fallbackError);
+                throw error; // Throw the original error
+            }
+        }
     }
 
     async updateVaultItem(vaultId: string, itemId: string, itemData: ClientVaultItemData, itemType: string = 'Password'): Promise<VaultItemDto> {
-        console.log('🔐 Updating vault item with zero-knowledge encryption...');
+        console.log('🔐 Updating vault item with vault-specific encryption...');
         console.log('🔍 Debug - vaultId:', vaultId);
         console.log('🔍 Debug - itemId:', itemId);
 
-        const encryptedData = await this.encryptData(itemData);
-        const encryptedTitle = await this.encryptData({ value: itemData.title });
+        // Get vault-specific key
+        const vaultKey = await this.getVaultKey(vaultId);
+        if (!vaultKey) {
+            throw new Error(`Could not obtain encryption key for vault ${vaultId}`);
+        }
+
+        const encryptedData = await encryptWithKey(itemData, vaultKey);
+        const encryptedTitle = await encryptWithKey({ value: itemData.title }, vaultKey);
 
         const request: UpdateVaultItemRequestDto = {
             id: itemId,
@@ -236,7 +448,7 @@ class VaultService {
         });
 
         const response = await apiClient.updateVaultItem(vaultId, itemId, request);
-        console.log('✅ Vault item updated with zero-knowledge encryption');
+        console.log('✅ Vault item updated with vault-specific encryption');
         return response.vaultItem;
     }
 
@@ -265,6 +477,13 @@ class VaultService {
     async searchVaultItems(vaultId: string, searchTerm: string): Promise<Array<{ item: VaultItemDto; decryptedData: ClientVaultItemData }>> {
         console.log(`🔍 Performing client-side zero-knowledge search for: "${searchTerm}"`);
 
+        // Get vault-specific key
+        const vaultKey = await this.getVaultKey(vaultId);
+        if (!vaultKey) {
+            console.warn(`Could not obtain encryption key for vault ${vaultId} - search will fail`);
+            return [];
+        }
+
         // Get all items (they come encrypted)
         const encryptedItems = await this.getVaultItems(vaultId);
         const searchResults: Array<{ item: VaultItemDto; decryptedData: ClientVaultItemData }> = [];
@@ -272,7 +491,8 @@ class VaultService {
         // Decrypt and search on client-side (Zero-Knowledge)
         for (const item of encryptedItems) {
             try {
-                const decryptedData = await this.decryptData<ClientVaultItemData>(item.encryptedData);
+                // Decrypt with vault-specific key
+                const decryptedData = await decryptWithKey<ClientVaultItemData>(item.encryptedData, vaultKey);
 
                 // Search in decrypted data
                 const searchLower = searchTerm.toLowerCase();

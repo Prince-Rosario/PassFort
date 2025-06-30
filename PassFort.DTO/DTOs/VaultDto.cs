@@ -14,6 +14,9 @@ namespace PassFort.DTO.DTOs
 
         [Required]
         public string EncryptedData { get; set; } = string.Empty; // Contains encrypted vault metadata
+        
+        [Required]
+        public string EncryptedVaultKey { get; set; } = string.Empty; // Vault-specific encryption key
     }
 
     public class UpdateVaultRequestDto
@@ -30,6 +33,9 @@ namespace PassFort.DTO.DTOs
 
         [Required]
         public string EncryptedData { get; set; } = string.Empty; // Contains encrypted vault metadata
+        
+        [Required]
+        public string EncryptedVaultKey { get; set; } = string.Empty; // Vault-specific encryption key
     }
 
     // Response DTOs
@@ -39,6 +45,7 @@ namespace PassFort.DTO.DTOs
         public string Name { get; set; } = string.Empty; // Encrypted
         public string? Description { get; set; } // Encrypted
         public string EncryptedData { get; set; } = string.Empty; // Encrypted vault metadata
+        public string EncryptedVaultKey { get; set; } = string.Empty; // Encrypted vault key
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
         public int ItemCount { get; set; } // Number of items in vault (for display purposes)
@@ -53,6 +60,13 @@ namespace PassFort.DTO.DTOs
         public DateTime UpdatedAt { get; set; }
         public int ItemCount { get; set; }
         public int FolderCount { get; set; }
+        
+        // Shared vault properties
+        public bool IsShared { get; set; } = false; // True if this vault is shared with the user (not owned)
+        public string? SharedPermission { get; set; } // Permission level if shared (Read, Write, Admin)
+        public string? SharedByUserEmail { get; set; } // Email of user who shared the vault
+        public DateTime? SharedAt { get; set; } // When the vault was shared
+        public string? EncryptedVaultKey { get; set; } // Encrypted vault key for shared vaults
     }
 
     public class CreateVaultResponseDto

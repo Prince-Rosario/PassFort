@@ -23,6 +23,7 @@ import { Input } from '../components/ui/Input';
 import { TeamMemberRoleSelector } from '../components/ui/TeamMemberRoleSelector';
 import { TeamService } from '../services/teamService';
 import { vaultService } from '../services/vaultService';
+import { SecureKeyManager, encryptVaultKey, deriveTeamKey } from '../utils/crypto';
 import type {
     Team,
     TeamMember,
@@ -50,6 +51,7 @@ export const TeamDetail: React.FC = () => {
     const [showShareVaultModal, setShowShareVaultModal] = useState(false);
     const [showEditTeamModal, setShowEditTeamModal] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+    const [showDeleteTeamConfirm, setShowDeleteTeamConfirm] = useState(false);
 
     // Form states
     const [inviteEmail, setInviteEmail] = useState('');
@@ -61,6 +63,8 @@ export const TeamDetail: React.FC = () => {
 
     useEffect(() => {
         if (teamId) {
+            // Store current team ID for shared vault decryption
+            localStorage.setItem('current_team_id', teamId);
             loadTeamData();
         }
     }, [teamId]);
@@ -82,11 +86,11 @@ export const TeamDetail: React.FC = () => {
             const decryptedVaults: Array<{ vault: VaultSummaryDto; decryptedName: string }> = [];
             for (const vault of vaultsData) {
                 try {
-                    // Decrypt the vault name for display
-                    const decryptedNameData = await vaultService.decryptData<{ value: string }>(vault.name);
+                    // Decrypt the vault name using vault-specific key
+                    const decryptedName = await vaultService.decryptVaultName(vault.id, vault.name);
                     decryptedVaults.push({
                         vault,
-                        decryptedName: decryptedNameData.value
+                        decryptedName: decryptedName
                     });
                 } catch (error) {
                     console.warn(`Failed to decrypt vault name for vault ${vault.id}:`, error);
@@ -138,11 +142,26 @@ export const TeamDetail: React.FC = () => {
         try {
             if (!teamId || !selectedVault) return;
 
+            console.log(`🔐 Starting team-based vault key sharing for vault ${selectedVault} with team ${teamId}`);
+
+            // Get the vault's encryption key 
+            const vaultKey = await vaultService.getVaultKey(selectedVault);
+            if (!vaultKey) {
+                setError('Could not access vault encryption key');
+                return;
+            }
+
+            // Create a team-based encrypted vault key that any team member can decrypt
+            // We'll use the teamId as a shared secret for this demonstration
+            const teamBasedKey = await deriveTeamKey(teamId);
+            const encryptedVaultKeyForSharing = await encryptVaultKey(vaultKey, teamBasedKey);
+            console.log('🔑 Encrypted vault key for team-based sharing');
+
             const shareData: ShareVaultRequest = {
                 vaultId: selectedVault,
                 teamId: teamId,
                 permission: vaultPermission,
-                encryptedVaultKey: '' // This would be encrypted with team keys in production
+                encryptedVaultKey: encryptedVaultKeyForSharing
             };
 
             await TeamService.shareVault(shareData);
@@ -150,6 +169,8 @@ export const TeamDetail: React.FC = () => {
             setVaultPermission(VaultPermission.Read);
             setShowShareVaultModal(false);
             await loadTeamData(); // Refresh data
+
+            console.log('✅ Vault successfully shared with team-based key encryption');
         } catch (err) {
             console.error('Error sharing vault:', err);
             setError('Failed to share vault');
@@ -192,6 +213,20 @@ export const TeamDetail: React.FC = () => {
         } catch (err) {
             console.error('Error unsharing vault:', err);
             setError('Failed to unshare vault');
+        }
+    };
+
+    const handleDeleteTeam = async () => {
+        try {
+            if (!teamId) return;
+
+            await TeamService.deleteTeam(teamId);
+            setShowDeleteTeamConfirm(false);
+            navigate('/teams'); // Navigate back to teams list
+        } catch (err) {
+            console.error('Error deleting team:', err);
+            setError('Failed to delete team');
+            setShowDeleteTeamConfirm(false);
         }
     };
 
@@ -300,6 +335,15 @@ export const TeamDetail: React.FC = () => {
                                     >
                                         <ShareIcon className="h-4 w-4 mr-2" />
                                         Share Vault
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="text-red-600 hover:text-red-700 border-red-300 hover:border-red-400"
+                                        onClick={() => setShowDeleteTeamConfirm(true)}
+                                    >
+                                        <TrashIcon className="h-4 w-4 mr-2" />
+                                        Delete Team
                                     </Button>
                                 </div>
                             )}
@@ -642,7 +686,7 @@ export const TeamDetail: React.FC = () => {
                     </div>
                 )}
 
-                {/* Delete Confirmation Modal */}
+                {/* Delete Member Confirmation Modal */}
                 {showDeleteConfirm && (
                     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
                         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md">
@@ -669,6 +713,42 @@ export const TeamDetail: React.FC = () => {
                                         className="flex-1 bg-red-600 hover:bg-red-700"
                                     >
                                         Remove
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Delete Team Confirmation Modal */}
+                {showDeleteTeamConfirm && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md">
+                            <div className="p-6">
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="w-10 h-10 bg-red-100 dark:bg-red-900/20 rounded-lg flex items-center justify-center">
+                                        <ExclamationTriangleIcon className="h-5 w-5 text-red-600 dark:text-red-400" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Delete Team</h3>
+                                        <p className="text-gray-600 dark:text-gray-400">
+                                            Are you sure you want to delete "{team?.name}"? This will permanently delete the team, all its members, and shared vault permissions. This action cannot be undone.
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex gap-3">
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => setShowDeleteTeamConfirm(false)}
+                                        className="flex-1"
+                                    >
+                                        Cancel
+                                    </Button>
+                                    <Button
+                                        onClick={handleDeleteTeam}
+                                        className="flex-1 bg-red-600 hover:bg-red-700"
+                                    >
+                                        Delete Team
                                     </Button>
                                 </div>
                             </div>

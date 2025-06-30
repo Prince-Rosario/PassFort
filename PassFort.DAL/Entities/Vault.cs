@@ -22,6 +22,10 @@ namespace PassFort.DAL.Entities
         [Required]
         public string EncryptedData { get; set; } = string.Empty; // Contains encrypted vault metadata
 
+        // Vault-specific encryption key (encrypted with owner's personal key)
+        [Required]
+        public string EncryptedVaultKey { get; set; } = string.Empty; // For proper key sharing
+
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 

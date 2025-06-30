@@ -149,6 +149,7 @@ export async function deriveEncryptionKey(email: string, masterPassword: string,
 export class SecureKeyManager {
     private static instance: SecureKeyManager;
     private encryptionKey: CryptoKey | null = null;
+    private vaultKeys: Map<string, CryptoKey> = new Map(); // Cache for vault-specific keys
 
     static getInstance(): SecureKeyManager {
         if (!SecureKeyManager.instance) {
@@ -165,8 +166,22 @@ export class SecureKeyManager {
         return this.encryptionKey;
     }
 
+    // Vault-specific key management
+    setVaultKey(vaultId: string, key: CryptoKey): void {
+        this.vaultKeys.set(vaultId, key);
+    }
+
+    getVaultKey(vaultId: string): CryptoKey | null {
+        return this.vaultKeys.get(vaultId) || null;
+    }
+
+    clearVaultKey(vaultId: string): void {
+        this.vaultKeys.delete(vaultId);
+    }
+
     clearKeys(): void {
         this.encryptionKey = null;
+        this.vaultKeys.clear();
     }
 }
 
@@ -222,4 +237,187 @@ export function validateMasterPasswordStrength(password: string): {
         score,
         issues
     };
+}
+
+/**
+ * Generates a new random encryption key for vault-specific encryption
+ */
+export async function generateVaultKey(): Promise<CryptoKey> {
+    return await crypto.subtle.generateKey(
+        {
+            name: 'AES-GCM',
+            length: 256
+        },
+        true, // extractable for key sharing
+        ['encrypt', 'decrypt']
+    );
+}
+
+/**
+ * Derives a team-based encryption key that any team member can access
+ * This is a demonstration approach for shared vault access
+ */
+export async function deriveTeamKey(teamId: string): Promise<CryptoKey> {
+    // Create a deterministic salt from the team ID
+    const teamSalt = new TextEncoder().encode(`team:${teamId}:shared`);
+
+    // Get current user's email for consistent key derivation
+    const userEmail = localStorage.getItem('user_email') || 'default';
+
+    // Create a base key material from team ID and user context
+    const keyMaterial = new TextEncoder().encode(`${teamId}:${userEmail}:teamkey`);
+
+    // Use PBKDF2 to derive a deterministic key
+    const baseKey = await crypto.subtle.importKey(
+        'raw',
+        keyMaterial,
+        { name: 'PBKDF2' },
+        false,
+        ['deriveKey']
+    );
+
+    // Derive the team key
+    const teamKey = await crypto.subtle.deriveKey(
+        {
+            name: 'PBKDF2',
+            salt: teamSalt,
+            iterations: 100000,
+            hash: 'SHA-256'
+        },
+        baseKey,
+        { name: 'AES-GCM', length: 256 },
+        false, // Not extractable
+        ['encrypt', 'decrypt']
+    );
+
+    console.log(`🔑 Derived team-based key for team ${teamId}`);
+    return teamKey;
+}
+
+/**
+ * Encrypts a vault key with another key (for sharing or storage)
+ */
+export async function encryptVaultKey(vaultKey: CryptoKey, encryptionKey: CryptoKey): Promise<string> {
+    // Export the vault key as raw bytes
+    const rawKey = await crypto.subtle.exportKey('raw', vaultKey);
+
+    // Generate a random IV
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+
+    // Encrypt the raw key
+    const encryptedKey = await crypto.subtle.encrypt(
+        {
+            name: 'AES-GCM',
+            iv: iv
+        },
+        encryptionKey,
+        rawKey
+    );
+
+    // Combine IV and encrypted key
+    const combined = new Uint8Array(iv.length + encryptedKey.byteLength);
+    combined.set(iv);
+    combined.set(new Uint8Array(encryptedKey), iv.length);
+
+    // Convert to base64
+    return btoa(String.fromCharCode(...combined));
+}
+
+/**
+ * Decrypts an encrypted vault key
+ */
+export async function decryptVaultKey(encryptedVaultKey: string, decryptionKey: CryptoKey): Promise<CryptoKey> {
+    try {
+        // Convert from base64
+        const combined = new Uint8Array(
+            atob(encryptedVaultKey).split('').map(char => char.charCodeAt(0))
+        );
+
+        // Extract IV and encrypted data
+        const iv = combined.slice(0, 12);
+        const encrypted = combined.slice(12);
+
+        // Decrypt the key
+        const decryptedKeyData = await crypto.subtle.decrypt(
+            {
+                name: 'AES-GCM',
+                iv: iv
+            },
+            decryptionKey,
+            encrypted
+        );
+
+        // Import as a CryptoKey
+        return await crypto.subtle.importKey(
+            'raw',
+            decryptedKeyData,
+            { name: 'AES-GCM' },
+            true, // extractable for further sharing
+            ['encrypt', 'decrypt']
+        );
+    } catch (error) {
+        console.error('Failed to decrypt vault key:', error);
+        throw new Error('Failed to decrypt vault key');
+    }
+}
+
+/**
+ * Encrypts data using AES-GCM
+ */
+export async function encryptWithKey(data: any, key: CryptoKey): Promise<string> {
+    const jsonString = JSON.stringify(data);
+    const encoder = new TextEncoder();
+    const dataBytes = encoder.encode(jsonString);
+
+    // Generate a random IV for each encryption
+    const iv = crypto.getRandomValues(new Uint8Array(12)); // 96-bit IV for AES-GCM
+
+    const encryptedData = await crypto.subtle.encrypt(
+        {
+            name: 'AES-GCM',
+            iv: iv
+        },
+        key,
+        dataBytes
+    );
+
+    // Combine IV and encrypted data
+    const combined = new Uint8Array(iv.length + encryptedData.byteLength);
+    combined.set(iv);
+    combined.set(new Uint8Array(encryptedData), iv.length);
+
+    // Convert to base64 for transmission
+    return btoa(String.fromCharCode(...combined));
+}
+
+/**
+ * Decrypts data using AES-GCM
+ */
+export async function decryptWithKey<T>(encryptedData: string, key: CryptoKey): Promise<T> {
+    try {
+        // Convert from base64
+        const combined = new Uint8Array(
+            atob(encryptedData).split('').map(char => char.charCodeAt(0))
+        );
+
+        // Extract IV and encrypted data
+        const iv = combined.slice(0, 12);
+        const encrypted = combined.slice(12);
+
+        const decryptedData = await crypto.subtle.decrypt(
+            {
+                name: 'AES-GCM',
+                iv: iv
+            },
+            key,
+            encrypted
+        );
+
+        const decoder = new TextDecoder();
+        const jsonString = decoder.decode(decryptedData);
+        return JSON.parse(jsonString);
+    } catch (error) {
+        console.error('Decryption failed:', error);
+        throw error;
+    }
 } 

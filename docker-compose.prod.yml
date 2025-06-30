@@ -32,10 +32,10 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Production}
       - ASPNETCORE_URLS=http://+:5123
-      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=${POSTGRES_DB:-passfort};Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres}
+      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=${POSTGRES_DB:-passfort};Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD}
       - JWT__SecretKey=${JWT_SECRET_KEY}
-      - JWT__Issuer=${JWT_ISSUER:-PassFort}
-      - JWT__Audience=${JWT_AUDIENCE:-PassFort}
+      - JWT__Issuer=${JWT_ISSUER:-PassFort.API}
+      - JWT__Audience=${JWT_AUDIENCE:-PassFort.Client}
     depends_on:
       postgres:
         condition: service_healthy

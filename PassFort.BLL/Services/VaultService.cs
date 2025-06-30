@@ -2,6 +2,7 @@ using PassFort.BLL.Mappers;
 using PassFort.BLL.Services.Interfaces;
 using PassFort.DAL.Repositories.Interfaces;
 using PassFort.DTO.DTOs;
+using PassFort.DAL.Entities;
 
 namespace PassFort.BLL.Services
 {
@@ -10,17 +11,54 @@ namespace PassFort.BLL.Services
         private readonly IVaultRepository _vaultRepository;
         private readonly IVaultItemRepository _vaultItemRepository;
         private readonly IVaultFolderRepository _vaultFolderRepository;
+        private readonly IVaultShareRepository _vaultShareRepository;
 
         public VaultService(
             IVaultRepository vaultRepository,
             IVaultItemRepository vaultItemRepository,
-            IVaultFolderRepository vaultFolderRepository
+            IVaultFolderRepository vaultFolderRepository,
+            IVaultShareRepository vaultShareRepository
         )
         {
             _vaultRepository = vaultRepository;
             _vaultItemRepository = vaultItemRepository;
             _vaultFolderRepository = vaultFolderRepository;
+            _vaultShareRepository = vaultShareRepository;
         }
+
+        #region Private Helper Methods
+
+        /// <summary>
+        /// Checks if a user has access to a vault (either as owner or through sharing)
+        /// </summary>
+        private async Task<bool> HasVaultAccessAsync(Guid vaultId, string userId, VaultPermission? requiredPermission = null)
+        {
+            // First check if user owns the vault
+            if (await _vaultRepository.ExistsAsync(vaultId, userId))
+            {
+                return true; // Owner has all permissions
+            }
+
+            // Check if user has access through vault sharing
+            return await _vaultShareRepository.HasUserAccessToVaultAsync(vaultId, userId, requiredPermission);
+        }
+
+        /// <summary>
+        /// Gets the user's permission level for a vault
+        /// </summary>
+        private async Task<VaultPermission?> GetUserVaultPermissionAsync(Guid vaultId, string userId)
+        {
+            // First check if user owns the vault
+            if (await _vaultRepository.ExistsAsync(vaultId, userId))
+            {
+                return VaultPermission.Admin; // Owner has admin permissions
+            }
+
+            // Check permission through vault sharing
+            return await _vaultShareRepository.GetUserPermissionForVaultAsync(vaultId, userId);
+        }
+
+        #endregion
 
         #region Vault Operations
 
@@ -51,10 +89,23 @@ namespace PassFort.BLL.Services
 
         public async Task<VaultDto> GetVaultAsync(string userId, Guid vaultId)
         {
+            // Check if user has read access to the vault
+            if (!await HasVaultAccessAsync(vaultId, userId, VaultPermission.Read))
+            {
+                throw new UnauthorizedAccessException("Vault not found or access denied");
+            }
+
+            // If user owns the vault, get it normally
             var vault = await _vaultRepository.GetByIdAndUserIdAsync(vaultId, userId);
+            
+            // If not owned, get by ID only (user has shared access)
             if (vault == null)
             {
-                throw new InvalidOperationException("Vault not found");
+                vault = await _vaultRepository.GetByIdAsync(vaultId);
+                if (vault == null)
+                {
+                    throw new InvalidOperationException("Vault not found");
+                }
             }
 
             // Get counts for display
@@ -66,14 +117,34 @@ namespace PassFort.BLL.Services
 
         public async Task<IEnumerable<VaultSummaryDto>> GetUserVaultsAsync(string userId)
         {
-            var vaults = await _vaultRepository.GetByUserIdAsync(userId);
+            // Get owned vaults
+            var ownedVaults = await _vaultRepository.GetByUserIdAsync(userId);
             var vaultSummaries = new List<VaultSummaryDto>();
 
-            foreach (var vault in vaults)
+            foreach (var vault in ownedVaults)
             {
                 var itemCount = await _vaultRepository.GetItemCountAsync(vault.Id);
                 var folderCount = await _vaultRepository.GetFolderCountAsync(vault.Id);
                 vaultSummaries.Add(VaultMapper.ToSummaryDto(vault, itemCount, folderCount));
+            }
+
+            // Get shared vaults
+            var sharedVaults = await _vaultShareRepository.GetByUserIdAsync(userId);
+            foreach (var vaultShare in sharedVaults)
+            {
+                var vault = vaultShare.Vault;
+                var itemCount = await _vaultRepository.GetItemCountAsync(vault.Id);
+                var folderCount = await _vaultRepository.GetFolderCountAsync(vault.Id);
+                var summary = VaultMapper.ToSummaryDto(vault, itemCount, folderCount);
+                
+                // Mark as shared and add permission info
+                summary.IsShared = true;
+                summary.SharedPermission = vaultShare.Permission.ToString();
+                summary.SharedByUserEmail = vaultShare.SharedByUser?.Email;
+                summary.SharedAt = vaultShare.SharedAt;
+                summary.EncryptedVaultKey = vaultShare.EncryptedVaultKey; // Include encrypted vault key
+                
+                vaultSummaries.Add(summary);
             }
 
             return vaultSummaries;
@@ -81,7 +152,13 @@ namespace PassFort.BLL.Services
 
         public async Task<VaultDto> UpdateVaultAsync(string userId, UpdateVaultRequestDto request)
         {
-            var vault = await _vaultRepository.GetByIdAndUserIdAsync(request.Id, userId);
+            // Check if user has write access to the vault
+            if (!await HasVaultAccessAsync(request.Id, userId, VaultPermission.Write))
+            {
+                throw new UnauthorizedAccessException("Vault not found or insufficient permissions");
+            }
+
+            var vault = await _vaultRepository.GetByIdAsync(request.Id);
             if (vault == null)
             {
                 throw new InvalidOperationException("Vault not found");
@@ -99,6 +176,7 @@ namespace PassFort.BLL.Services
 
         public async Task<bool> DeleteVaultAsync(string userId, Guid vaultId)
         {
+            // Only vault owners can delete vaults
             var vault = await _vaultRepository.GetByIdAndUserIdAsync(vaultId, userId);
             if (vault == null)
             {
@@ -118,11 +196,10 @@ namespace PassFort.BLL.Services
             CreateVaultItemRequestDto request
         )
         {
-            // Verify vault exists and belongs to user
-            var vaultExists = await _vaultRepository.ExistsAsync(request.VaultId, userId);
-            if (!vaultExists)
+            // Check if user has write access to the vault
+            if (!await HasVaultAccessAsync(request.VaultId, userId, VaultPermission.Write))
             {
-                throw new UnauthorizedAccessException("Vault not found or access denied");
+                throw new UnauthorizedAccessException("Vault not found or insufficient permissions");
             }
 
             // If folder is specified, verify it exists and belongs to the same vault
@@ -148,9 +225,8 @@ namespace PassFort.BLL.Services
 
         public async Task<VaultItemDto> GetVaultItemAsync(string userId, Guid vaultId, Guid itemId)
         {
-            // Verify vault belongs to user
-            var vaultExists = await _vaultRepository.ExistsAsync(vaultId, userId);
-            if (!vaultExists)
+            // Check if user has read access to the vault
+            if (!await HasVaultAccessAsync(vaultId, userId, VaultPermission.Read))
             {
                 throw new UnauthorizedAccessException("Vault not found or access denied");
             }
@@ -169,9 +245,8 @@ namespace PassFort.BLL.Services
 
         public async Task<IEnumerable<VaultItemDto>> GetVaultItemsAsync(string userId, Guid vaultId)
         {
-            // Verify vault belongs to user
-            var vaultExists = await _vaultRepository.ExistsAsync(vaultId, userId);
-            if (!vaultExists)
+            // Check if user has read access to the vault
+            if (!await HasVaultAccessAsync(vaultId, userId, VaultPermission.Read))
             {
                 throw new UnauthorizedAccessException("Vault not found or access denied");
             }
@@ -186,9 +261,8 @@ namespace PassFort.BLL.Services
             string itemType
         )
         {
-            // Verify vault belongs to user
-            var vaultExists = await _vaultRepository.ExistsAsync(vaultId, userId);
-            if (!vaultExists)
+            // Check if user has read access to the vault
+            if (!await HasVaultAccessAsync(vaultId, userId, VaultPermission.Read))
             {
                 throw new UnauthorizedAccessException("Vault not found or access denied");
             }
@@ -203,9 +277,8 @@ namespace PassFort.BLL.Services
             Guid folderId
         )
         {
-            // Verify vault belongs to user
-            var vaultExists = await _vaultRepository.ExistsAsync(vaultId, userId);
-            if (!vaultExists)
+            // Check if user has read access to the vault
+            if (!await HasVaultAccessAsync(vaultId, userId, VaultPermission.Read))
             {
                 throw new UnauthorizedAccessException("Vault not found or access denied");
             }
@@ -226,9 +299,8 @@ namespace PassFort.BLL.Services
             Guid vaultId
         )
         {
-            // Verify vault belongs to user
-            var vaultExists = await _vaultRepository.ExistsAsync(vaultId, userId);
-            if (!vaultExists)
+            // Check if user has read access to the vault
+            if (!await HasVaultAccessAsync(vaultId, userId, VaultPermission.Read))
             {
                 throw new UnauthorizedAccessException("Vault not found or access denied");
             }
@@ -248,11 +320,10 @@ namespace PassFort.BLL.Services
                 throw new InvalidOperationException("Vault item not found");
             }
 
-            // Verify vault belongs to user
-            var vaultExists = await _vaultRepository.ExistsAsync(item.VaultId, userId);
-            if (!vaultExists)
+            // Check if user has write access to the vault
+            if (!await HasVaultAccessAsync(item.VaultId, userId, VaultPermission.Write))
             {
-                throw new UnauthorizedAccessException("Vault not found or access denied");
+                throw new UnauthorizedAccessException("Vault not found or insufficient permissions");
             }
 
             // If folder is specified, verify it exists and belongs to the same vault
@@ -278,11 +349,10 @@ namespace PassFort.BLL.Services
 
         public async Task<bool> DeleteVaultItemAsync(string userId, Guid vaultId, Guid itemId)
         {
-            // Verify vault belongs to user
-            var vaultExists = await _vaultRepository.ExistsAsync(vaultId, userId);
-            if (!vaultExists)
+            // Check if user has write access to the vault
+            if (!await HasVaultAccessAsync(vaultId, userId, VaultPermission.Write))
             {
-                throw new UnauthorizedAccessException("Vault not found or access denied");
+                throw new UnauthorizedAccessException("Vault not found or insufficient permissions");
             }
 
             var item = await _vaultItemRepository.GetByIdAndVaultIdAsync(itemId, vaultId);
@@ -297,11 +367,10 @@ namespace PassFort.BLL.Services
 
         public async Task<bool> ToggleFavoriteAsync(string userId, Guid vaultId, Guid itemId)
         {
-            // Verify vault belongs to user
-            var vaultExists = await _vaultRepository.ExistsAsync(vaultId, userId);
-            if (!vaultExists)
+            // Check if user has write access to the vault
+            if (!await HasVaultAccessAsync(vaultId, userId, VaultPermission.Write))
             {
-                throw new UnauthorizedAccessException("Vault not found or access denied");
+                throw new UnauthorizedAccessException("Vault not found or insufficient permissions");
             }
 
             var item = await _vaultItemRepository.GetByIdAndVaultIdAsync(itemId, vaultId);
@@ -324,11 +393,10 @@ namespace PassFort.BLL.Services
             CreateVaultFolderRequestDto request
         )
         {
-            // Verify vault exists and belongs to user
-            var vaultExists = await _vaultRepository.ExistsAsync(request.VaultId, userId);
-            if (!vaultExists)
+            // Check if user has write access to the vault
+            if (!await HasVaultAccessAsync(request.VaultId, userId, VaultPermission.Write))
             {
-                throw new UnauthorizedAccessException("Vault not found or access denied");
+                throw new UnauthorizedAccessException("Vault not found or insufficient permissions");
             }
 
             // If parent folder is specified, verify it exists and belongs to the same vault
@@ -358,9 +426,8 @@ namespace PassFort.BLL.Services
             Guid folderId
         )
         {
-            // Verify vault belongs to user
-            var vaultExists = await _vaultRepository.ExistsAsync(vaultId, userId);
-            if (!vaultExists)
+            // Check if user has read access to the vault
+            if (!await HasVaultAccessAsync(vaultId, userId, VaultPermission.Read))
             {
                 throw new UnauthorizedAccessException("Vault not found or access denied");
             }
@@ -383,9 +450,8 @@ namespace PassFort.BLL.Services
             Guid vaultId
         )
         {
-            // Verify vault belongs to user
-            var vaultExists = await _vaultRepository.ExistsAsync(vaultId, userId);
-            if (!vaultExists)
+            // Check if user has read access to the vault
+            if (!await HasVaultAccessAsync(vaultId, userId, VaultPermission.Read))
             {
                 throw new UnauthorizedAccessException("Vault not found or access denied");
             }
@@ -408,9 +474,8 @@ namespace PassFort.BLL.Services
             Guid vaultId
         )
         {
-            // Verify vault belongs to user
-            var vaultExists = await _vaultRepository.ExistsAsync(vaultId, userId);
-            if (!vaultExists)
+            // Check if user has read access to the vault
+            if (!await HasVaultAccessAsync(vaultId, userId, VaultPermission.Read))
             {
                 throw new UnauthorizedAccessException("Vault not found or access denied");
             }
@@ -439,11 +504,10 @@ namespace PassFort.BLL.Services
                 throw new InvalidOperationException("Vault folder not found");
             }
 
-            // Verify vault belongs to user
-            var vaultExists = await _vaultRepository.ExistsAsync(folder.VaultId, userId);
-            if (!vaultExists)
+            // Check if user has write access to the vault
+            if (!await HasVaultAccessAsync(folder.VaultId, userId, VaultPermission.Write))
             {
-                throw new UnauthorizedAccessException("Vault not found or access denied");
+                throw new UnauthorizedAccessException("Vault not found or insufficient permissions");
             }
 
             // If parent folder is specified, verify it exists, belongs to the same vault, and prevent circular references
@@ -478,11 +542,10 @@ namespace PassFort.BLL.Services
 
         public async Task<bool> DeleteVaultFolderAsync(string userId, Guid vaultId, Guid folderId)
         {
-            // Verify vault belongs to user
-            var vaultExists = await _vaultRepository.ExistsAsync(vaultId, userId);
-            if (!vaultExists)
+            // Check if user has write access to the vault
+            if (!await HasVaultAccessAsync(vaultId, userId, VaultPermission.Write))
             {
-                throw new UnauthorizedAccessException("Vault not found or access denied");
+                throw new UnauthorizedAccessException("Vault not found or insufficient permissions");
             }
 
             var folder = await _vaultFolderRepository.GetByIdAndVaultIdAsync(folderId, vaultId);

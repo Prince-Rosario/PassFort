@@ -13,6 +13,7 @@ namespace PassFort.BLL.Mappers
                 Name = vault.Name, // Already encrypted by client
                 Description = vault.Description, // Already encrypted by client
                 EncryptedData = vault.EncryptedData,
+                EncryptedVaultKey = vault.EncryptedVaultKey,
                 CreatedAt = vault.CreatedAt,
                 UpdatedAt = vault.UpdatedAt,
                 ItemCount = itemCount,
@@ -45,6 +46,7 @@ namespace PassFort.BLL.Mappers
                 Name = dto.Name, // Client sends this encrypted
                 Description = dto.Description, // Client sends this encrypted
                 EncryptedData = dto.EncryptedData,
+                EncryptedVaultKey = dto.EncryptedVaultKey,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow,
             };
@@ -55,6 +57,7 @@ namespace PassFort.BLL.Mappers
             vault.Name = dto.Name; // Client sends this encrypted
             vault.Description = dto.Description; // Client sends this encrypted
             vault.EncryptedData = dto.EncryptedData;
+            vault.EncryptedVaultKey = dto.EncryptedVaultKey;
             vault.UpdatedAt = DateTime.UtcNow;
         }
 

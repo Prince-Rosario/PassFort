@@ -51,6 +51,7 @@ export interface VaultShare {
     sharedByUserEmail: string;
     sharedAt: string;
     lastAccessedAt?: string;
+    encryptedVaultKey: string;
 }
 
 // Request DTOs

@@ -101,6 +101,9 @@ namespace PassFort.DTO.DTOs
         public string SharedByUserEmail { get; set; } = string.Empty;
         public DateTime SharedAt { get; set; }
         public DateTime? LastAccessedAt { get; set; }
+        
+        // Encrypted vault key for accessing shared vault content
+        public string EncryptedVaultKey { get; set; } = string.Empty;
     }
 
     public class ShareVaultRequestDto
